@@ -1,8 +1,10 @@
 getVOT <- function(sound, sr, plot=TRUE,
                    closure_interval = 10,
-                   release_param = 20,
+                   release_param = 15,
+                   vo_method = 'acf',
                    vo_granularity = 1,
-                   vo_param = 0.85) {
+                   vo_param = 0.85,
+                   f0_wl = 30, f0_minacf = 0.5) {
 
   ci <- closure_interval/1000
 
@@ -38,21 +40,32 @@ getVOT <- function(sound, sr, plot=TRUE,
       vot = 'NA'
     ))
   } else {
-    sq_vo <- seq(from=rel+(step*5), to=rel+(step*200), by=(step*vo_granularity))
-    mu_acf <- c()
-    i <- 1
-    for (s in sq_vo) {
-      acf <- stats::acf(sound[s:(s+(step*vo_granularity)-1)], plot=F, na.action=na.pass)
-      mu_acf[i] <- mean(acf$acf)
-      i <- i+1
+    if (!(vo_method %in% c('acf', 'f0'))) {
+      stop('Legal parameters for vo_method are acf and f0.')
     }
 
-    # hi_acf <- which(mu_acf > acf_threshold)
-    hi_acf <- which(mu_acf > max(mu_acf, na.rm=T)*vo_param)
-    if (is.na(hi_acf[2])) {
-      vo <- (rel + (hi_acf[1]*(step*vo_granularity)) + step)
-    } else {
-      vo <- (rel + (hi_acf[2]*(step*vo_granularity)) + step)
+    if (vo_method == 'acf') {
+      sq_vo <- seq(from=rel+(step*5), to=rel+(step*200), by=(step*vo_granularity))
+      mu_acf <- c()
+      i <- 1
+      for (s in sq_vo) {
+        acf <- stats::acf(sound[s:(s+(step*vo_granularity)-1)], plot=F, na.action=na.pass)
+        mu_acf[i] <- mean(acf$acf)
+        i <- i+1
+      }
+
+      hi_acf <- which(mu_acf > max(mu_acf, na.rm=T)*vo_param)
+      if (is.na(hi_acf[2])) {
+        vo <- (rel + (hi_acf[1]*(step*vo_granularity)) + step)
+      } else {
+        vo <- (rel + (hi_acf[2]*(step*vo_granularity)) + step)
+      }
+
+
+    } else if (vo_method == 'f0') {
+      f0 <- phonTools::pitchtrack(sound[rel:length(sound)], fs=sr, show=F,
+                                  windowlength=f0_wl, minacf=f0_minacf)
+      vo <- round(f0$time[1]) * step + rel
     }
 
     vot <- round((vo-rel)/sr, 4) * 1000
@@ -72,21 +85,11 @@ getVOT <- function(sound, sr, plot=TRUE,
     ))
   }
 
-  # f0 <- phonTools::pitchtrack(sound[rel:length(sound)], fs=sr, show=F,
-  #                             windowlength=wl, minacf=minacf) #timestep?
-  # vo <- round(f0$time[1]) * step + rel
-
-  # sq_vo <- seq(from=rel+step, to=length(sound), by=step)
-  # min_amp <- c()
-  # i <- 1
-  # for (s in sq_vo) {
-  #   min_amp[i] <- min(sound[s:(s+step-1)])
-  #   i <- i+1
-  # }
-  #
-  # gulf_size <- min(sound)/2
-  # gulf <- which(min_amp < gulf_size)
-  # vo <- (rel + (gulf[1]*step))-step
+}
 
 
+
+for (f in fls){
+  snd <- rPraat::snd.read(f)
+  getVOT(snd$sig, 48000, vo_method='acf', f0_wl=30, f0_minacf=0.5, release_param=15)
 }

@@ -1,8 +1,11 @@
 VOT2newTG <- function(folder, verbose=TRUE,
                       closure_interval = 10,
-                      release_param = 20,
+                      release_param = 15,
+                      vo_method = 'acf',
                       vo_granularity = 1,
-                      vo_param = 0.85){
+                      vo_param = 0.85,
+                      f0_wl = 30, f0_minacf = 0.5) {
+
   fls <- list.files(folder)
   dir.create(paste0(folder, '/tg'))
 
@@ -18,7 +21,8 @@ VOT2newTG <- function(folder, verbose=TRUE,
     } else {
       snd <- rPraat::snd.read(f)
       vot <- getVOT(snd$sig, snd$fs, plot=F, closure_interval,
-                    release_param, vo_granularity, vo_param)
+                    release_param, vo_method,
+                    vo_granularity, vo_param, f0_wl, f0_minacf)
 
       tg <- rPraat::tg.createNewTextGrid(0, snd$duration)
       tg <- rPraat::tg.insertNewIntervalTier(tg, newTierName='vot')
