@@ -55,7 +55,7 @@ addVOT2TG <- function(folder, tg_tier, seg_list,
       tg <- rPraat::tg.insertInterval(tg, new_tier_name,
                                       tStart=t1 + vot$rel/snd$fs,
                                       tEnd=t1 + vot$vo/snd$fs,
-                                      label=as.character(vot$vot))
+                                      label='vot')
     }
 
     tg <- rPraat::tg.removeTier(tg, 'copy')

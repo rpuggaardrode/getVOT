@@ -66,6 +66,14 @@ getVOT <- function(sound, sr, plot=TRUE,
       f0 <- phonTools::pitchtrack(sound[rel:length(sound)], fs=sr, show=F,
                                   windowlength=f0_wl, minacf=f0_minacf)
       vo <- round(f0$time[1]) * step + rel
+
+      if (is.na(vo)) {
+        return(list(
+          rel = rel,
+          vo = rel+(0.02*sr),
+          vot = 'NA'
+        ))
+      }
     }
 
     vot <- round((vo-rel)/sr, 4) * 1000
@@ -73,7 +81,7 @@ getVOT <- function(sound, sr, plot=TRUE,
     if(plot){
       plot(y=sound, x=seq(0, dur, length.out=length(sound)), type='l',
            xlab='Time (s)',
-           ylab='Amplitude (dB)')
+           ylab='Amplitude')
       abline(v=rel/sr, col='red')
       abline(v=vo/sr, col='red')
     }
@@ -87,9 +95,9 @@ getVOT <- function(sound, sr, plot=TRUE,
 
 }
 
-
+par(mfrow=c(3,3))
 
 for (f in fls){
   snd <- rPraat::snd.read(f)
-  getVOT(snd$sig, 48000, vo_method='acf', f0_wl=30, f0_minacf=0.5, release_param=15)
+  getVOT(snd$sig, snd$fs)
 }

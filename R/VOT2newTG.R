@@ -29,7 +29,7 @@ VOT2newTG <- function(folder, verbose=TRUE,
       tg <- rPraat::tg.insertInterval(tg, 'vot',
                               tStart=vot$rel/snd$fs,
                               tEnd=vot$vo/snd$fs,
-                              label=as.character(vot$vot))
+                              label='vot')
 
       rPraat::tg.write(tg, paste0(folder, '/tg/', flname, '.TextGrid'))
 
