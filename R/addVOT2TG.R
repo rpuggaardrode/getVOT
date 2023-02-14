@@ -46,7 +46,7 @@ addVOT2TG <- function(folder, tg_tier, seg_list,
         t1 <- tg$copy$t1[int]
       }
 
-      snd <- rPraat::snd.read(paste0(tgfl, '.wav'),
+      snd <- rPraat::snd.read(paste0(folder, '/', tgfl, '.wav'),
                               from=t1,
                               to=tg$copy$t2[int], units='seconds')
       vot <- getVOT(snd$sig, snd$fs, plot=F, closure_interval,
