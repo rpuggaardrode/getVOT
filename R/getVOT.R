@@ -1,3 +1,47 @@
+#' Predict positive voice onset time and plot wave with segmented stop release
+#'
+#' @param sound Numeric vector corresponding to a sound wave.
+#' @param sr Integer; sample rate of `sound`.
+#' @param plot Logical; if `TRUE` (default), will plot wave with segmented
+#' stop release.
+#' @param closure_interval Numeric. The rough location of the stop closure is
+#' predicted by finding the quietest interval in the first half of `sound`;
+#' `closure_interval` determines the duration of intervals to look for.
+#' Default is `10`.
+#' @param release_param Numeric. The location of the burst is predicted by
+#' searching for the first instance after the
+#' estimated closure where a 1 ms interval has
+#' an energy equal to or higher than this proportion of the maximum energy in
+#' `sound`. Default is `15`.
+#' @param vo_method String giving the method for predicting the onset of voicing.
+#' There are two legal options:
+#' * `acf` (default). The beginning of voicing is predicted from the mean degree
+#' of energy autocorrelation in short intervals of `sound` relative to the most
+#' autocorrelated interval during the vowel. This method seems to work best
+#' when `sound` has a high sample rate of e.g. 44.1 kHz or 48 kHz.
+#' * `f0`. The beginning of voicing is predicted using the pitch tracking
+#' algorithm implemented in `phonTools::pitchtrack()`. This method seeks to work
+#' best when `sound` has a low sample rate of e.g. 16 kHz.
+#' @param vo_granularity Numeric, only used when `vo_method='acf'`. Mean energy
+#' autocorrelation is calculated for intervals of this duration (in ms). Default
+#' is `1`.
+#' @param vo_param Numeric, only used when `vo_method='acf'`. Voicing onset
+#' is predicted by comparing the mean autocorrelation in intervals throughout
+#' the release and vowel to the interval with the highest autocorrelation,
+#' and finding the first interval where mean autocorrelation is at this
+#' proportion of the most autocorrelated interval. Default is `0.85`.
+#' @param f0_wl Numeric, only used when `vo_method='f0'`. The length of the
+#' analysis window in ms passed on to `phonTools::pitchtrack()`. Default is `30`,
+#' much flower than the `phonTools::pitchtrack()` default of `50`, which seems
+#' to give better less conservative results when searching for the first pulses
+#' after a stop burst.
+#' @param f0_minacf Numeric, only used when `vo_method='f0'`. Autocorrelation
+#' values below this are ignored by `phonTools::pitchtrack()`. Default is `0.5`.
+#'
+#' @return
+#' @export
+#'
+#' @examples
 getVOT <- function(sound, sr, plot=TRUE,
                    closure_interval = 10,
                    release_param = 15,
@@ -93,11 +137,4 @@ getVOT <- function(sound, sr, plot=TRUE,
     ))
   }
 
-}
-
-par(mfrow=c(3,3))
-
-for (f in fls){
-  snd <- rPraat::snd.read(f)
-  getVOT(snd$sig, snd$fs)
 }
