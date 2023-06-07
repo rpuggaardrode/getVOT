@@ -1,15 +1,22 @@
 Package: getVOT
-Title: Predict positive voice onset time
-Version: 0.0.0.9000
+Title: Predict voice onset time
+Version: 0.0.1
 Authors@R: 
     person("Rasmus", "Puggaard-Rode", , "r.puggaard@phonetik.uni-muenchen.de", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-4522-9987"))
-Description: What the package does (one paragraph).
+Description: Positive or negative voice onset time for stop consonants is 
+  predicted and plotted or added to Praat TextGrids or an EMU database. 
+  Functions are also available for optimizing prediction parameters based on a 
+  small annotated data set provided by the user.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
 Imports: 
+    dplyr,
+    emuR,
+    graphics,
+    jpeg,
     phonTools,
     purrr,
     rPraat,
