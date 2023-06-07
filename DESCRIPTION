@@ -22,3 +22,5 @@ Imports:
     rPraat,
     stats,
     stringr
+URL: https://github.com/rpuggaardrode/getVOT
+BugReports: https://github.com/rpuggaardrode/getVOT/issues
