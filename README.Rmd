@@ -34,6 +34,8 @@ devtools::install_github('rpuggaardrode/getVOT')
 
 ## Workflow
 
+I give a few examples below of how the main functions of `getVOT` work. There is a longer tutorial on [LingMethodsHub](https://lingmethodshub.github.io/content/R/getVOT-tutorial/), which also gets into the nitty-gritty of how it works under the hood.
+
 ### No training data
 
 ``` {r, echo=FALSE}
@@ -87,6 +89,3 @@ VOT2newTG(directory='my_directory', sign='positive',
           pos_params_list=optimized_params)
 ```
 
-## How does it work?
-
-If you're interested in the nitty-gritty of how `getVOT` works, you can have a look at [these slides](https://rpuggaardrode.github.io/getVOT-pres). Otherwise, the help functions are fairly detailed and give usage examples.
