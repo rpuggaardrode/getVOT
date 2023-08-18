@@ -39,7 +39,7 @@ minimize prediction error the most. These parameters can then be used for
 the rest of the data set.
 }
 \examples{
-datapath <- system.file('extdata/vl', package='getVOT')
+datapath <- system.file('extdata/vd', package='getVOT')
 neg_setParams(directory=datapath)
 }
 \seealso{

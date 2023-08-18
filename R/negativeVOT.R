@@ -210,7 +210,11 @@ negativeVOT <- function(sound, sr,
 
       for (i in 10:(round(length(srch)/step)*10)) {
         stp <- f0_start + ((i*step) / 10)
-        slice <- phonTools::spectralslice(sound[(stp-step+1):stp], show=F)[,2]
+        slice_this <- sound[(stp-step+1):stp]
+        if (sr > 16000) {
+          slice_this <- seewave::resamp(slice_this, f=sr, g=16000)[,1]
+        }
+        slice <- phonTools::spectralslice(slice_this, show=F)[,2]
         smoothness[i-9] <- stats::sd(diff(slice))
       }
 
