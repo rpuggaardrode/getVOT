@@ -23,6 +23,13 @@
 #' is sufficiently high and stable, `acf` usually gives the best results.
 #' * `f0`. The onset of voicing is predicted using the pitch tracking
 #' algorithm implemented in [phonTools::pitchtrack].
+#' * `zcr`. The onset of voicing is predicted from the zero crossing rate.
+#' ZCR is calculated in
+#' 5 ms windows with 80% overlap, and the resulting time series is smoothed
+#' using a discrete cosine transformation with the number of coefficients set to
+#' 1/10 of the number of windows. The first ZCR value below the threshold set by
+#' `zcr_min` is predicted to correspond to the voicing onset, unless there is
+#' an adjacent gap in low ZCR values.
 #' @param vo_granularity Numeric, only used when `vo_method='acf'`. Mean energy
 #' autocorrelation is calculated for intervals of this duration (in ms). Default
 #' is `1`.
@@ -44,6 +51,10 @@
 #' estimating the location of the closure, but rather uses [phonTools::pitchtrack]
 #' to find the longest period of consecutive voicing, and searches for the burst
 #' in the 200ms chunk prior to the onset of that period.
+#' @param zcr_min Numeric, only used when `vo_method='zcr'`. Voicing is
+#' predicted to begin when ZCR values after the predicted release
+#' are consistently below this threshold.
+#' Default is `0.02`.
 #' @param plot Logical; should the results be plotted? Default is `TRUE`.
 #' @param params_list A named list containing the above parameters for
 #' determining the onset of voicing. Usually returned by [pos_setParams()], but
@@ -92,6 +103,7 @@ positiveVOT <- function(sound, sr,
                         vo_granularity = 1,
                         vo_param = 0.85,
                         f0_wl = 30, f0_minacf = 0.5,
+                        zcr_min = 0.05,
                         burst_only=FALSE,
                         f0_first=FALSE,
                         plot=TRUE,
@@ -123,9 +135,12 @@ positiveVOT <- function(sound, sr,
     if ('f0_minacf' %in% named_params) {
       f0_minacf <- params_list[['f0_minacf']]
     }
+    if ('zcr_min' %in% named_params) {
+      zcr_min <- params_list[['zcr_min']]
+    }
   }
 
-  if (!(vo_method %in% c('acf', 'f0'))) {
+  if (!(vo_method %in% c('acf', 'f0', 'zcr'))) {
     stop('vo_method must be either acf or f0')
   }
 
@@ -227,10 +242,6 @@ positiveVOT <- function(sound, sr,
       spike=spike_size
     ))
   } else {
-    if (!(vo_method %in% c('acf', 'f0'))) {
-      stop('Legal parameters for vo_method are acf and f0.')
-    }
-
     if (vo_method == 'acf') {
       sq_vo <- seq(from=rel+(step*5), to=rel+(step*200), by=(step*vo_granularity))
       mu_acf <- c()
@@ -249,7 +260,6 @@ positiveVOT <- function(sound, sr,
         vo <- (rel + (hi_acf[2]*(step*vo_granularity)) + step)
       }
 
-
     } else if (vo_method == 'f0') {
       f0 <- phonTools::pitchtrack(sound[rel:length(sound)], fs=sr, show=F,
                                   windowlength=f0_wl, minacf=f0_minacf)
@@ -262,6 +272,32 @@ positiveVOT <- function(sound, sr,
           vot = 'NA'
         ))
       }
+
+    } else if (vo_method == 'zcr') {
+      vo_srch <- sound[rel:length(sound)]
+      zcr_ts <- seewave::zcr(vo_srch, sr, wl=sr*0.005, ovlp=80, plot=F)
+      zcr_smooth <- emuR::dct(zcr_ts[,'zcr'], m=length(zcr_ts)/20, fit=T)
+      zcr_smooth[1:10] <- NA
+
+      if (min(zcr_smooth, na.rm=T) < zcr_min) {
+        low_zcr <- which(zcr_smooth < zcr_min)
+        if (max(diff(low_zcr)) < 40) {
+          f0_start <- (zcr_ts[low_zcr[1], 'time'] * sr)
+        } else {
+          first_voi <- which(diff(low_zcr) > 40)[1] + 1
+          if (first_voi > 20 | is.na(first_voi)) {
+            f0_start <- (zcr_ts[low_zcr[1], 'time'] * sr)
+          } else {
+            f0_start <- (zcr_ts[low_zcr[first_voi], 'time'] * sr)
+          }
+        }
+      } else {
+        f0_start <- (min(zcr_ts[,'zcr']) * sr)
+      }
+
+      vo <- f0_start + rel
+      names(vo) <- NULL
+
     }
 
     vot <- round((vo-rel)/sr, 4) * 1000

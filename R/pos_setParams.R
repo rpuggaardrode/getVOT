@@ -10,6 +10,7 @@
 #' pairs. Ideally, each WAV file should contain just one syllable with a stop,
 #' where the stop closure is placed somewhere in the first half of the sound file.
 #' The TextGrid tier containing hand-segmented VOT should be named `vot`.
+#' Default is the current working directory.
 #' @param when_use_f0 Numeric; default is `10`. Per default, voicing onset is
 #' predicted with [positiveVOT] using `method='acf'`. This is the preferred method
 #' because it is significantly faster than the alternative `method='f0'`. For
@@ -32,6 +33,8 @@
 #' the progress? Default is `TRUE`.
 #' @param plot Logical; should predicted VOT using the resulting parameters
 #' be plotted against the hand-annotated VOT?
+#' @param ... Additional graphical parameters to be passed on to
+#' [plot_training_diff].
 #'
 #' @return A named list with optimized parameters for the training data; see
 #' [positiveVOT] for more information.
@@ -46,11 +49,11 @@
 #' @examples
 #' datapath <- system.file('extdata/vl', package='getVOT')
 #' pos_setParams(directory=datapath)
-pos_setParams <- function(directory,
+pos_setParams <- function(directory='.',
                           when_use_f0=10,
                           when_use_f0_first=10,
                           verbose=TRUE,
-                          plot=TRUE) {
+                          plot=TRUE, ...) {
 
   tg_list <- list.files(directory, '*.TextGrid')
   wav_list <- list.files(directory, '*.wav')
@@ -266,14 +269,29 @@ pos_setParams <- function(directory,
 
         pred$gran[i] <- gran
         pred$p[i] <- p
+        pred$method[i] <- 'acf'
+        pred$zcrmin[i] <- NA
         pred[[wav_list[snd]]][i] <- abs(tg_t2 - tmp$vo)
         i <- i+1
       }
     }
+
+    for (z in c(0.02, 0.04, 0.06, 0.08, 0.1)) {
+      tmp <- positiveVOT(sig[,1], fs, vo_method='zcr', closure_interval=ci_winner,
+                         release_param=rp_winner, f0_first=f0_first, zcr_min=z,
+                         plot=F)
+
+      pred$gran[i] <- NA
+      pred$p[i] <- NA
+      pred$method[i] <- 'zcr'
+      pred$zcrmin[i] <- z
+      pred[[wav_list[snd]]][i] <- abs(tg_t2 - tmp$vo)
+      i <- i+1
+    }
   }
 
   pred <- as.data.frame(pred)
-  pred$diff_mean <- rowMeans(pred[3:ncol(pred)])
+  pred$diff_mean <- rowMeans(pred[5:ncol(pred)])
 
   if (verbose) {
     print(paste0('On average, the selected voicing onset parameters after a ',
@@ -284,6 +302,8 @@ pos_setParams <- function(directory,
   winner <- which.min(pred$diff_mean)
   good_gran <- pred$gran[winner]
   good_p <- pred$p[winner]
+  good_z <- pred$zcrmin[winner]
+  good_method <- pred$method[winner]
 
   finetune <- list()
 
@@ -300,25 +320,45 @@ pos_setParams <- function(directory,
 
     i = 1
 
-    for (gran in c(good_gran-0.1, good_gran-0.05, good_gran, good_gran+0.05,
-                   good_gran+0.1)) {
+    if (good_method == 'acf') {
+      for (gran in c(good_gran-0.1, good_gran-0.05, good_gran, good_gran+0.05,
+                     good_gran+0.1)) {
 
-      for (p in c(good_p-0.02, good_p-0.01, good_p, good_p+0.01, good_p+0.02)) {
-        tmp <- positiveVOT(sig[,1], fs, vo_method='acf', closure_interval = ci_winner,
-                           release_param=rp_winner, f0_first=f0_first,
-                           vo_granularity = gran, vo_param = p,
+        for (p in c(good_p-0.02, good_p-0.01, good_p, good_p+0.01, good_p+0.02)) {
+          tmp <- positiveVOT(sig[,1], fs, vo_method='acf', closure_interval = ci_winner,
+                             release_param=rp_winner, f0_first=f0_first,
+                             vo_granularity = gran, vo_param = p,
+                             plot=F)
+
+          finetune$gran[i] <- gran
+          finetune$p[i] <- p
+          finetune$method <- 'acf'
+          finetune$z <- NA
+          finetune[[wav_list[snd]]][i] <- abs(tg_t2 - tmp$vo)
+          i <- i+1
+        }
+      }
+    }
+
+    if (good_method == 'zcr') {
+      for (z in c(good_z-0.01, good_z-0.005, good_z, good_z+0.005, good_z+0.01)) {
+        tmp <- positiveVOT(sig[,1], fs, vo_method='zcr', closure_interval=ci_winner,
+                           release_param=rp_winner, f0_first=f0_first, zcr_min=z,
                            plot=F)
 
-        finetune$gran[i] <- gran
-        finetune$p[i] <- p
+        finetune$gran[i] <- NA
+        finetune$p[i] <- NA
+        finetune$method[i] <- 'zcr'
+        finetune$zcrmin[i] <- z
         finetune[[wav_list[snd]]][i] <- abs(tg_t2 - tmp$vo)
         i <- i+1
       }
     }
+
   }
 
   finetune <- as.data.frame(finetune)
-  finetune$diff_mean <- rowMeans(finetune[3:ncol(finetune)])
+  finetune$diff_mean <- rowMeans(finetune[5:ncol(finetune)])
 
   if (verbose) {
     print(paste0('On average, the selected voicing onset parameters after finetuning ',
@@ -328,11 +368,13 @@ pos_setParams <- function(directory,
   winner <- which.min(finetune$diff_mean)[1]
   p_winner <- finetune$p[winner]
   gran_winner <- finetune$gran[winner]
-  acf_results <- min(finetune$diff_mean) / (fs/1000)
+  z_winner <- finetune$zcrmin[winner]
+  method_winner <- finetune$method[winner]
+  no_f0 <- min(finetune$diff_mean) / (fs/1000)
 
-  if (acf_results > when_use_f0) {
+  if (no_f0 > when_use_f0) {
     if (verbose) {
-      print(paste0('Average agreement with training data below ,',
+      print(paste0('Average agreement with training data below ',
                    when_use_f0,
                    ' ms. Trying vo_method=f0'))
     }
@@ -423,13 +465,13 @@ pos_setParams <- function(directory,
     acf_winner <- finetune$acf[winner]
     f0_results <- min(finetune$diff_mean) / (fs/1000)
 
-    if (f0_results < acf_results) {
+    if (f0_results < no_f0) {
       method <- 'f0'
     } else {
-      method <- 'acf'
+      method <- method_winner
     }
   } else {
-    method <- 'acf'
+    method <- method_winner
     wl_winner <- NULL
     acf_winner <- NULL
   }
@@ -442,11 +484,12 @@ pos_setParams <- function(directory,
     f0_first = f0_first,
     vo_method = method,
     f0_wl = wl_winner,
-    f0_minacf = acf_winner
+    f0_minacf = acf_winner,
+    zcr_min = z_winner
   )
 
   if (plot) {
-    plot_training_diff(directory, pl)
+    plot_training_diff(directory, pl, ...)
   }
 
   return(pl)

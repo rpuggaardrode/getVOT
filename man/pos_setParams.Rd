@@ -5,18 +5,20 @@
 \title{Optimize parameters for predicting positive voice onset time}
 \usage{
 pos_setParams(
-  directory,
+  directory = ".",
   when_use_f0 = 10,
   when_use_f0_first = 10,
   verbose = TRUE,
-  plot = TRUE
+  plot = TRUE,
+  ...
 )
 }
 \arguments{
 \item{directory}{A string giving the location of a directory with WAV/TextGrid
 pairs. Ideally, each WAV file should contain just one syllable with a stop,
 where the stop closure is placed somewhere in the first half of the sound file.
-The TextGrid tier containing hand-segmented VOT should be named \code{vot}.}
+The TextGrid tier containing hand-segmented VOT should be named \code{vot}.
+Default is the current working directory.}
 
 \item{when_use_f0}{Numeric; default is \code{10}. Per default, voicing onset is
 predicted with \link{positiveVOT} using \code{method='acf'}. This is the preferred method
@@ -43,6 +45,9 @@ the progress? Default is \code{TRUE}.}
 
 \item{plot}{Logical; should predicted VOT using the resulting parameters
 be plotted against the hand-annotated VOT?}
+
+\item{...}{Additional graphical parameters to be passed on to
+\link{plot_training_diff}.}
 }
 \value{
 A named list with optimized parameters for the training data; see

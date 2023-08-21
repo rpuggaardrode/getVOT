@@ -13,8 +13,9 @@ negativeVOT(
   vo_param = 0.9,
   f0_wl = 50,
   f0_minacf = 0.5,
+  zcr_min = 0.02,
   vo_only = FALSE,
-  rel_method = "transient",
+  rel_method = "amplitude",
   plot = TRUE,
   params_list = NULL
 )
@@ -33,6 +34,13 @@ autocorrelated interval during the vowel (see \code{vo_param}). If audio quality
 is sufficiently high and stable, \code{acf} usually gives the best results.
 \item \code{f0}. The onset of voicing is predicted using the pitch tracking
 algorithm implemented in \link[phonTools:pitchtrack]{phonTools::pitchtrack}.
+\item \code{zcr}. The onset of voicing is predicted from the zero crossing rate.
+ZCR is calculated in
+5 ms windows with 80\% overlap, and the resulting time series is smoothed
+using a discrete cosine transformation with the number of coefficients set to
+1/10 of the number of windows. The first ZCR value below the threshold set by
+\code{zcr_min} is predicted to correspond to the voicing onset, unless there is
+an adjacent gap in low ZCR values.
 }}
 
 \item{closure_interval}{Numeric. The rough location of the voicing onset is
@@ -57,18 +65,16 @@ analysis window in ms passed on to \link[phonTools:pitchtrack]{phonTools::pitcht
 \item{f0_minacf}{Numeric, only used when \code{vo_method='f0'}. Autocorrelation
 values below this are ignored by \link[phonTools:pitchtrack]{phonTools::pitchtrack}. Default is \code{0.5}.}
 
+\item{zcr_min}{Numeric, only used when \code{vo_method='zcr'}. Voicing is
+predicted to begin when ZCR values are consistently below this threshold.
+Default is \code{0.02}.}
+
 \item{vo_only}{Logical; if \code{TRUE}, only voicing onset is predicted.}
 
 \item{rel_method}{String giving the method for predicting the location of the
 burst. There are two legal options:
 \itemize{
-\item \code{transient} (default). The location of the burst is predicted by searching
-for the transient phase. \link[phonTools:spectralslice]{phonTools::spectralslice} is used to generate
-FFT spectra of short portions of \code{sound} after the predicted onset of voicing,
-and the smoothest spectrum is predicted to be the location of the transient.
-If audio quality is sufficiently high and stable, \code{transient} usually gives
-the best results.
-\item \code{amplitude}. The location of the burst is predicted by searching for a
+\item \code{amplitude} (default). The location of the burst is predicted by searching for a
 sudden increase in amplitude (which usually signifies the beginning of the
 vowel, which in pre-voiced stops should be very close to the burst).
 In practice, this is done by recording the highest amplitude in up to 500
@@ -76,6 +82,12 @@ In practice, this is done by recording the highest amplitude in up to 500
 resulting time series using a discrete cosine transformation using
 \link[emuR:dct]{emuR::dct}, and locating the portion of the resulting function with the
 highest velocity.
+\item \code{transient}. The location of the burst is predicted by searching
+for the transient phase. \link[phonTools:spectralslice]{phonTools::spectralslice} is used to generate
+FFT spectra of short portions of \code{sound} after the predicted onset of voicing,
+and the smoothest spectrum is predicted to be the location of the transient.
+If audio quality is sufficiently high and stable, \code{transient} usually gives
+the best results.
 }}
 
 \item{plot}{Logical; should the results be plotted? Default is \code{TRUE}.}
@@ -92,6 +104,7 @@ not important; see details above):
 \item \code{f0_wl}
 \item \code{f0_minacf}
 \item \code{rel_method}
+\item \code{min_zcr}
 If a \code{params_list} is provided, it will override any corresponding
 parameters in the function call.
 }}

@@ -14,6 +14,7 @@ positiveVOT(
   vo_param = 0.85,
   f0_wl = 30,
   f0_minacf = 0.5,
+  zcr_min = 0.05,
   burst_only = FALSE,
   f0_first = FALSE,
   plot = TRUE,
@@ -45,6 +46,13 @@ autocorrelated interval during the vowel (see \code{vo_param}). If audio quality
 is sufficiently high and stable, \code{acf} usually gives the best results.
 \item \code{f0}. The onset of voicing is predicted using the pitch tracking
 algorithm implemented in \link[phonTools:pitchtrack]{phonTools::pitchtrack}.
+\item \code{zcr}. The onset of voicing is predicted from the zero crossing rate.
+ZCR is calculated in
+5 ms windows with 80\% overlap, and the resulting time series is smoothed
+using a discrete cosine transformation with the number of coefficients set to
+1/10 of the number of windows. The first ZCR value below the threshold set by
+\code{zcr_min} is predicted to correspond to the voicing onset, unless there is
+an adjacent gap in low ZCR values.
 }}
 
 \item{vo_granularity}{Numeric, only used when \code{vo_method='acf'}. Mean energy
@@ -66,6 +74,11 @@ after a stop burst.}
 
 \item{f0_minacf}{Numeric, only used when \code{vo_method='f0'}. Autocorrelation
 values below this are ignored by \link[phonTools:pitchtrack]{phonTools::pitchtrack}. Default is \code{0.5}.}
+
+\item{zcr_min}{Numeric, only used when \code{vo_method='zcr'}. Voicing is
+predicted to begin when ZCR values after the predicted release
+are consistently below this threshold.
+Default is \code{0.02}.}
 
 \item{burst_only}{Logical; if \code{TRUE}, only burst location is predicted.}
 

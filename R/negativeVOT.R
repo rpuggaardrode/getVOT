@@ -14,6 +14,13 @@
 #' is sufficiently high and stable, `acf` usually gives the best results.
 #' * `f0`. The onset of voicing is predicted using the pitch tracking
 #' algorithm implemented in [phonTools::pitchtrack].
+#' * `zcr`. The onset of voicing is predicted from the zero crossing rate.
+#' ZCR is calculated in
+#' 5 ms windows with 80% overlap, and the resulting time series is smoothed
+#' using a discrete cosine transformation with the number of coefficients set to
+#' 1/10 of the number of windows. The first ZCR value below the threshold set by
+#' `zcr_min` is predicted to correspond to the voicing onset, unless there is
+#' an adjacent gap in low ZCR values.
 #' @param closure_interval Numeric. The rough location of the voicing onset is
 #' predicted by first finding the quietest interval in the first half of `sound`;
 #' `closure_interval` determines the duration of intervals to look for in ms.
@@ -31,16 +38,13 @@
 #' analysis window in ms passed on to [phonTools::pitchtrack]. Default is `50`.
 #' @param f0_minacf Numeric, only used when `vo_method='f0'`. Autocorrelation
 #' values below this are ignored by [phonTools::pitchtrack]. Default is `0.5`.
+#' @param zcr_min Numeric, only used when `vo_method='zcr'`. Voicing is
+#' predicted to begin when ZCR values are consistently below this threshold.
+#' Default is `0.02`.
 #' @param vo_only Logical; if `TRUE`, only voicing onset is predicted.
 #' @param rel_method String giving the method for predicting the location of the
 #' burst. There are two legal options:
-#' * `transient` (default). The location of the burst is predicted by searching
-#' for the transient phase. [phonTools::spectralslice] is used to generate
-#' FFT spectra of short portions of `sound` after the predicted onset of voicing,
-#' and the smoothest spectrum is predicted to be the location of the transient.
-#' If audio quality is sufficiently high and stable, `transient` usually gives
-#' the best results.
-#' * `amplitude`. The location of the burst is predicted by searching for a
+#' * `amplitude` (default). The location of the burst is predicted by searching for a
 #' sudden increase in amplitude (which usually signifies the beginning of the
 #' vowel, which in pre-voiced stops should be very close to the burst).
 #' In practice, this is done by recording the highest amplitude in up to 500
@@ -48,6 +52,12 @@
 #' resulting time series using a discrete cosine transformation using
 #' [emuR::dct], and locating the portion of the resulting function with the
 #' highest velocity.
+#' * `transient`. The location of the burst is predicted by searching
+#' for the transient phase. [phonTools::spectralslice] is used to generate
+#' FFT spectra of short portions of `sound` after the predicted onset of voicing,
+#' and the smoothest spectrum is predicted to be the location of the transient.
+#' If audio quality is sufficiently high and stable, `transient` usually gives
+#' the best results.
 #' @param plot Logical; should the results be plotted? Default is `TRUE`.
 #' @param params_list A named list containing the above parameters for
 #' determining the onset of voicing. Usually returned by [neg_setParams()], but
@@ -60,6 +70,7 @@
 #' * `f0_wl`
 #' * `f0_minacf`
 #' * `rel_method`
+#' * `min_zcr`
 #' If a `params_list` is provided, it will override any corresponding
 #' parameters in the function call.
 #'
@@ -99,8 +110,9 @@ negativeVOT <- function(sound, sr,
                         vo_granularity = 1.2,
                         vo_param=0.9,
                         f0_wl=50, f0_minacf=0.5,
+                        zcr_min=0.02,
                         vo_only=FALSE,
-                        rel_method='transient',
+                        rel_method='amplitude',
                         plot=TRUE,
                         params_list=NULL) {
 
@@ -130,49 +142,18 @@ negativeVOT <- function(sound, sr,
     if ('rel_method' %in% named_params) {
       rel_method <- params_list[['rel_method']]
     }
+    if ('zcr_min' %in% named_params) {
+      zcr_min <- params_list[['zcr_min']]
+    }
   }
 
   step <- round(1*(sr/1000))
 
-  if (!(vo_method %in% c('acf', 'f0'))) {
-    stop('vo_method must be either acf or f0')
+  if (!(vo_method %in% c('acf', 'f0', 'zcr'))) {
+    stop('vo_method must be either acf, f0, or zcr')
   }
   if (!(rel_method %in% c('transient', 'amplitude'))) {
     stop('rel_method must be either transient or amplitude')
-  }
-
-  if (vo_method == 'acf') {
-    ci <- closure_interval/1000
-
-    dur <- length(sound)/sr
-    sqlen <- ceiling(length(sound)/2 / sr / ci)
-    sq_clo <- seq(from=sr*ci, to=sqlen*sr*ci, by=sr*ci)
-
-    mean_amp <- c()
-    i <- 1
-    for (s in sq_clo) {
-      mean_amp[i] <- mean(abs(sound[(s-(sr*ci)+1):s]))
-      i <- i+1
-    }
-    clo <- (which(mean_amp==min(mean_amp))[1] - 0.5) * sr * ci
-
-    sq_vo <- seq(from=clo, to=length(sound), by=(step*vo_granularity))
-    mu_acf <- c()
-    i <- 1
-    for (s in sq_vo) {
-      acf <- stats::acf(sound[s:(s+(step*vo_granularity)-1)], plot=F,
-                        na.action=stats::na.pass)
-      mu_acf[i] <- mean(acf$acf)
-      i <- i+1
-    }
-
-    hi_acf <- which(mu_acf > max(mu_acf, na.rm=T)*vo_param)
-    if (is.na(hi_acf[2])) {
-      f0_start <- (clo + (hi_acf[1]*(step*vo_granularity)) + step)
-    } else {
-      f0_start <- (clo + (hi_acf[2]*(step*vo_granularity)) + step)
-    }
-
   }
 
   f0 <- phonTools::pitchtrack(sound, fs=sr, show=F, minacf=f0_minacf,
@@ -187,6 +168,66 @@ negativeVOT <- function(sound, sr,
         f0_start <- f0$time[1] * (sr/1000)
       }
     } else {f0_start <- NA}
+
+  } else {
+
+    ci <- closure_interval/1000
+
+    dur <- length(sound)/sr
+    sqlen <- ceiling(length(sound)/2 / sr / ci)
+    sq_clo <- seq(from=sr*ci, to=sqlen*sr*ci, by=sr*ci)
+
+    mean_amp <- c()
+    i <- 1
+    for (s in sq_clo) {
+      mean_amp[i] <- mean(abs(sound[(s-(sr*ci)+1):s]))
+      i <- i+1
+    }
+    clo <- (which(mean_amp==min(mean_amp))[1] - 0.5) * sr * ci
+
+    if (vo_method == 'acf') {
+      sq_vo <- seq(from=clo, to=length(sound), by=(step*vo_granularity))
+      mu_acf <- c()
+      i <- 1
+      for (s in sq_vo) {
+        acf <- stats::acf(sound[s:(s+(step*vo_granularity)-1)], plot=F,
+                          na.action=stats::na.pass)
+        mu_acf[i] <- mean(acf$acf)
+        i <- i+1
+      }
+
+      hi_acf <- which(mu_acf > max(mu_acf, na.rm=T)*vo_param)
+      if (is.na(hi_acf[2])) {
+        f0_start <- (clo + (hi_acf[1]*(step*vo_granularity)) + step)
+      } else {
+        f0_start <- (clo + (hi_acf[2]*(step*vo_granularity)) + step)
+      }
+    }
+
+    if (vo_method == 'zcr') {
+      vo_srch <- sound[clo:length(sound)]
+
+      zcr_ts <- seewave::zcr(vo_srch, sr, wl=sr*0.005, ovlp=80, plot=F)
+      zcr_smooth <- emuR::dct(zcr_ts[,'zcr'], m=length(zcr_ts)/20, fit=T)
+
+      if (min(zcr_smooth) < zcr_min) {
+        low_zcr <- which(zcr_smooth < zcr_min)
+        if (max(diff(low_zcr)) < 40) {
+          f0_start <- (zcr_ts[low_zcr[1], 'time'] * sr) + clo
+        } else {
+          first_voi <- which(diff(low_zcr) > 40)[1] + 1
+          if (first_voi > 20 | is.na(first_voi)) {
+            f0_start <- (zcr_ts[low_zcr[1], 'time'] * sr) + clo
+          } else {
+            f0_start <- (zcr_ts[low_zcr[first_voi], 'time'] * sr) + clo
+          }
+        }
+      } else {
+        f0_start <- (min(zcr_ts[,'zcr']) * sr) + clo
+      }
+
+      names(f0_start) <- NULL
+    }
 
   }
 
