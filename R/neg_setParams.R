@@ -10,6 +10,7 @@
 #' pairs. Ideally, each WAV file should contain just one syllable with a stop,
 #' where the stop closure is placed somewhere in the first half of the sound file.
 #' The TextGrid tier containing hand-segmented VOT should be named `vot`.
+#' Default is the current working directory.
 #' @param when_use_f0 Numeric; default is `10`. Per default, voicing onset is
 #' predicted with [negativeVOT] using `method='acf'`. This is the preferred method
 #' because it is significantly faster than the alternative `method='f0'`. For
@@ -22,6 +23,8 @@
 #' the progress? Default is `TRUE`.
 #' @param plot Logical; should predicted VOT using the resulting parameters
 #' be plotted against the hand-annotated VOT?
+#' @param ... Additional graphical parameters to be passed on to
+#' [plot_training_diff].
 #'
 #' @return A named list with optimized parameters for the training data; see
 #' [negativeVOT] for more information.
@@ -36,10 +39,11 @@
 #' @examples
 #' datapath <- system.file('extdata/vd', package='getVOT')
 #' neg_setParams(directory=datapath)
-neg_setParams <- function(directory,
+neg_setParams <- function(directory='.',
                           when_use_f0=10,
                           verbose=TRUE,
-                          plot=TRUE) {
+                          plot=TRUE,
+                          ...) {
 
   tg_list <- list.files(directory, '*.TextGrid')
   wav_list <- list.files(directory, '*.wav')
@@ -77,16 +81,31 @@ neg_setParams <- function(directory,
           pred$ci[i] <- ci
           pred$gran[i] <- gran
           pred$p[i] <- p
+          pred$method[i] <- 'acf'
+          pred$zcrmin[i] <- NA
           pred[[wav_list[snd]]][i] <- abs(tg_t1 - tmp$vo)
           i <- i+1
         }
+      }
+
+      for (z in c(0.02, 0.04, 0.06, 0.08, 0.1)) {
+        tmp <- negativeVOT(sig[,1], fs, vo_method='zcr', closure_interval = ci,
+                           zcr_min = z, vo_only = T, plot = F)
+
+        pred$ci[i] <- ci
+        pred$gran[i] <- NA
+        pred$p[i] <- NA
+        pred$method[i] <- 'zcr'
+        pred$zcrmin[i] <- z
+        pred[[wav_list[snd]]][i] <- abs(tg_t1 - tmp$vo)
+        i <- i+1
       }
     }
 
   }
 
   pred <- as.data.frame(pred)
-  pred$diff_mean <- rowMeans(pred[4:ncol(pred)])
+  pred$diff_mean <- rowMeans(pred[6:ncol(pred)])
 
   if (verbose) {
     print(paste0('On average, the selected parameters for voicing onset after a first pass ',
@@ -98,6 +117,8 @@ neg_setParams <- function(directory,
   good_ci <- pred$ci[winner]
   good_gran <- pred$gran[winner]
   good_p <- pred$p[winner]
+  good_z <- pred$zcrmin[winner]
+  good_method <- pred$method[winner]
 
   finetune <- list()
 
@@ -116,29 +137,46 @@ neg_setParams <- function(directory,
     i <- 1
 
     for (ci in c(good_ci-2, good_ci-1, good_ci, good_ci+1, good_ci+2)) {
+      if (good_method == 'acf') {
+        for (gran in c(good_gran-0.1, good_gran-0.05, good_gran,
+                       good_gran+0.05, good_gran+0.1)) {
 
-      for (gran in c(good_gran-0.1, good_gran-0.05, good_gran,
-                     good_gran+0.05, good_gran+0.1)) {
+          for (p in c(good_p-0.02, good_p-0.01, good_p,
+                      good_p+0.01, good_p+0.02)) {
+            tmp <- negativeVOT(sig[,1], fs, vo_method='acf', closure_interval = ci,
+                               vo_granularity = gran, vo_param = p, vo_only=T,
+                               plot=F)
 
-        for (p in c(good_p-0.02, good_p-0.01, good_p,
-                    good_p+0.01, good_p+0.02)) {
-          tmp <- negativeVOT(sig[,1], fs, vo_method='acf', closure_interval = ci,
-                             vo_granularity = gran, vo_param = p, vo_only=T,
-                             plot=F)
+            finetune$ci[i] <- ci
+            finetune$gran[i] <- gran
+            finetune$p[i] <- p
+            finetune$method[i] <- 'acf'
+            finetune$z[i] <- NA
+            finetune[[wav_list[snd]]][i] <- abs(tg_t1 - tmp$vo)
+            i <- i+1
+          }
+        }
+      }
+
+      if (good_method == 'zcr') {
+        for (z in c(good_z-0.01, good_z-0.005, good_z, good_z+0.005, good_z+0.01)) {
+          tmp <- negativeVOT(sig[,1], fs, vo_method='zcr', closure_interval = ci,
+                             zcr_min = z, vo_only = T, plot = F)
 
           finetune$ci[i] <- ci
-          finetune$gran[i] <- gran
-          finetune$p[i] <- p
+          finetune$gran[i] <- NA
+          finetune$p[i] <- NA
+          finetune$method[i] <- 'zcr'
+          finetune$z[i] <- z
           finetune[[wav_list[snd]]][i] <- abs(tg_t1 - tmp$vo)
           i <- i+1
         }
       }
     }
-
   }
 
   finetune <- as.data.frame(finetune)
-  finetune$diff_mean <- rowMeans(finetune[4:ncol(finetune)])
+  finetune$diff_mean <- rowMeans(finetune[6:ncol(finetune)])
 
   if (verbose) {
     print(paste0('On average, the selected voicing onset parameters after finetuning ',
@@ -150,9 +188,10 @@ neg_setParams <- function(directory,
   ci_winner <- finetune$ci[winner]
   gran_winner <- finetune$gran[winner]
   p_winner <- finetune$p[winner]
-  acf_results <- min(finetune$diff_mean) / (fs/1000)
+  z_winner <- finetune$z[winner]
+  no_f0 <- min(finetune$diff_mean) / (fs/1000)
 
-  if (acf_results > when_use_f0) {
+  if (no_f0 > when_use_f0) {
     if (verbose) {
       print(paste0('Average agreement with training data below ',
                    when_use_f0,
@@ -243,13 +282,13 @@ neg_setParams <- function(directory,
     acf_winner <- finetune$acf[winner]
     f0_results <- min(finetune$diff_mean) / (fs/1000)
 
-    if (f0_results < acf_results) {
+    if (f0_results < no_f0) {
       method <- 'f0'
     } else {
-      method <- 'acf'
+      method <- good_method
     }
   } else {
-    method <- 'acf'
+    method <- good_method
     wl_winner <- 50
     acf_winner <- 0.5
   }
@@ -258,7 +297,7 @@ neg_setParams <- function(directory,
 
   for (snd in 1:length(wav_list)){
     if (verbose) {
-      print(paste0('Testing accuracy of different burst detection methods ',
+      print(paste0('Testing accuracy of different burst detection methods for ',
                    wav_list[snd]))
     }
 
@@ -274,7 +313,7 @@ neg_setParams <- function(directory,
                          f0_wl=wl_winner, f0_minacf=acf_winner,
                          closure_interval=ci_winner,
                          vo_granularity=gran_winner,
-                         vo_param=p_winner,
+                         vo_param=p_winner, zcr_min=z_winner,
                          rel_method=rm,
                          plot=F)
 
@@ -289,7 +328,7 @@ neg_setParams <- function(directory,
   }
 
   if (verbose) {
-    print(paste0('On average, the select burst detection method agree',
+    print(paste0('On average, the selected burst detection method agree ',
                  'with the training data within a margin of ',
                  round(mean(pred[[rm]]) / (fs/1000), 3), ' ms'))
   }
@@ -301,11 +340,12 @@ neg_setParams <- function(directory,
     vo_method = method,
     f0_wl = wl_winner,
     f0_minacf = acf_winner,
-    rel_method=rm
+    rel_method = rm,
+    zcr_min = z_winner
   )
 
   if (plot) {
-    plot_training_diff(directory, pl)
+    plot_training_diff(directory, pl, ...)
   }
 
   return(pl)
