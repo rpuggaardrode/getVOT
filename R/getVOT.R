@@ -19,6 +19,17 @@
 #' voice onset time; see [positiveVOT] for more information. Default is `NULL`,
 #' in which case default parameters are used, but note that the default
 #' parameters do not necessarily scale particularly well.
+#' @param vo_only Boolean; default is `FALSE`. Can be set to `TRUE` if
+#' `sign='positive'`, and the data is already aligned such that
+#' intervals are aligned to the release. In this case, the burst location is
+#' set as the beginning of the interval, and only voicing onset location is
+#' predicted.
+#' @param rel_offset Numeric, default is `0.01`. If `vo_only=TRUE`, the algorithm
+#' may perform poorly if there is periodicity from e.g. voicing bleed early on
+#' in the interval (this is especially likely if used to delimit fricatives,
+#' but probably won't hurt when delimiting stop releases).
+#' `rel_offset` tells `getVOT` how much of the initial portion of an interval
+#' to ignore when looking for voicing onset (in seconds).
 #'
 #' @return A named list with the following elements:
 #' * `vo` Gives the sample number where the onset of voicing is predicted.
@@ -39,9 +50,12 @@
 getVOT <- function(sound, sr,
                    sign=c('positive', 'negative'),
                    neg_params_list=NULL,
-                   pos_params_list=NULL) {
+                   pos_params_list=NULL,
+                   vo_only=FALSE,
+                   rel_offset=0.01) {
 
   if ('positive' %in% sign & 'negative' %in% sign) {
+    if (vo_only) stop('If vo_only=TRUE, sign must currently be positive')
     pos_test <- positiveVOT(sound, sr, plot=F,
                             params_list=pos_params_list)
 
@@ -58,9 +72,11 @@ getVOT <- function(sound, sr,
       return(pos_test[-4])
     }
   } else if ('positive' %in% sign) {
-    tmp <- positiveVOT(sound, sr, plot=F, params_list=pos_params_list)
+    tmp <- positiveVOT(sound, sr, plot=F, params_list=pos_params_list,
+                       vo_only=vo_only, rel_offset=rel_offset)
     return(tmp[-4])
   } else if ('negative' %in% sign) {
+    if (vo_only) stop('If vo_only=TRUE, sign must currently be positive')
     tmp <- negativeVOT(sound, sr, plot=F, params_list=neg_params_list)
   }
 }

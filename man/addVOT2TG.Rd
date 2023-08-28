@@ -12,7 +12,9 @@ addVOT2TG(
   new_tier_name = "vot",
   sign = c("positive", "negative"),
   pos_params_list = NULL,
-  neg_params_list = NULL
+  neg_params_list = NULL,
+  vo_only = FALSE,
+  rel_offset = 0.01
 )
 }
 \arguments{
@@ -52,6 +54,19 @@ parameters do not necessarily scale particularly well.}
 voice onset time; see \link{negativeVOT} for more information. Default is \code{NULL},
 in which case default parameters are used, but note that the default
 parameters do not necessarily scale particularly well.}
+
+\item{vo_only}{Boolean; default is \code{FALSE}. Can be set to \code{TRUE} if
+\code{sign='positive'}, and the data is already aligned such that
+intervals are aligned to the release. In this case, the burst location is
+set as the beginning of the interval, and only voicing onset location is
+predicted.}
+
+\item{rel_offset}{Numeric, default is \code{0.01}. If \code{vo_only=TRUE}, the algorithm
+may perform poorly if there is periodicity from e.g. voicing bleed early on
+in the interval (this is especially likely if used to delimit fricatives,
+but probably won't hurt when delimiting stop releases).
+\code{rel_offset} tells \code{getVOT} how much of the initial portion of an interval
+to ignore when looking for voicing onset (in seconds).}
 }
 \description{
 Loops through a directory with pairs of WAV files and Praat TextGrids,

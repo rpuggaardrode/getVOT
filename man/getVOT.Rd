@@ -9,7 +9,9 @@ getVOT(
   sr,
   sign = c("positive", "negative"),
   neg_params_list = NULL,
-  pos_params_list = NULL
+  pos_params_list = NULL,
+  vo_only = FALSE,
+  rel_offset = 0.01
 )
 }
 \arguments{
@@ -33,6 +35,19 @@ parameters do not necessarily scale particularly well.}
 voice onset time; see \link{positiveVOT} for more information. Default is \code{NULL},
 in which case default parameters are used, but note that the default
 parameters do not necessarily scale particularly well.}
+
+\item{vo_only}{Boolean; default is \code{FALSE}. Can be set to \code{TRUE} if
+\code{sign='positive'}, and the data is already aligned such that
+intervals are aligned to the release. In this case, the burst location is
+set as the beginning of the interval, and only voicing onset location is
+predicted.}
+
+\item{rel_offset}{Numeric, default is \code{0.01}. If \code{vo_only=TRUE}, the algorithm
+may perform poorly if there is periodicity from e.g. voicing bleed early on
+in the interval (this is especially likely if used to delimit fricatives,
+but probably won't hurt when delimiting stop releases).
+\code{rel_offset} tells \code{getVOT} how much of the initial portion of an interval
+to ignore when looking for voicing onset (in seconds).}
 }
 \value{
 A named list with the following elements:

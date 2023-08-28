@@ -35,6 +35,17 @@
 #' voice onset time; see [positiveVOT] for more information. Default is `NULL`,
 #' in which case default parameters are used, but note that the default
 #' parameters do not necessarily scale particularly well.
+#' @param vo_only Boolean; default is `FALSE`. Can be set to `TRUE` if
+#' `sign='positive'`, and the data is already aligned such that
+#' intervals are aligned to the release. In this case, the burst location is
+#' set as the beginning of the interval, and only voicing onset location is
+#' predicted.
+#' @param rel_offset Numeric, default is `0.01`. If `vo_only=TRUE`, the algorithm
+#' may perform poorly if there is periodicity from e.g. voicing bleed early on
+#' in the interval (this is especially likely if used to delimit fricatives,
+#' but probably won't hurt when delimiting stop releases).
+#' `rel_offset` tells `getVOT` how much of the initial portion of an interval
+#' to ignore when looking for voicing onset (in seconds).
 #'
 #' @seealso WAV files are imported and TextGrids are exported using the `rPraat`
 #' package. Voice onset time is predicted using the [getVOT] function, which
@@ -52,7 +63,9 @@ addVOT2TG <- function(directory, tg_tier, seg_list,
                       new_tier_name = 'vot',
                       sign = c('positive', 'negative'),
                       pos_params_list=NULL,
-                      neg_params_list=NULL
+                      neg_params_list=NULL,
+                      vo_only=FALSE,
+                      rel_offset=0.01
                       ){
 
   if (length(sign) == 1) {
@@ -98,7 +111,7 @@ addVOT2TG <- function(directory, tg_tier, seg_list,
     sl_ints <- which(stringr::str_detect(tg$copy$label, sl_regex))
 
     for (int in sl_ints) {
-      if (tg$copy$t1[int] - 0.015 > 0) {
+      if (tg$copy$t1[int] - 0.015 > 0 & !vo_only) {
         t1 <- tg$copy$t1[int] - 0.015
       } else {
         t1 <- tg$copy$t1[int]
@@ -107,7 +120,8 @@ addVOT2TG <- function(directory, tg_tier, seg_list,
       snd <- rPraat::snd.read(paste0(directory, '/', tgfl, '.wav'),
                               from=t1,
                               to=tg$copy$t2[int], units='seconds')
-      vot <- getVOT(snd$sig[,1], snd$fs, sign=sign, neg_params_list, pos_params_list)
+      vot <- getVOT(snd$sig[,1], snd$fs, sign=sign, neg_params_list,
+                    pos_params_list, vo_only=vo_only, rel_offset=rel_offset)
       if (vot$vot > 0) {
         tg <- rPraat::tg.insertInterval(tg, new_tier_name,
                                         tStart=t1 + vot$rel/snd$fs,

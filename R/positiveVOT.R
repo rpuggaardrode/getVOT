@@ -47,6 +47,17 @@
 #' @param f0_minacf Numeric, only used when `vo_method='f0'`. Autocorrelation
 #' values below this are ignored by [phonTools::pitchtrack]. Default is `0.5`.
 #' @param burst_only Logical; if `TRUE`, only burst location is predicted.
+#' @param vo_only Boolean; default is `FALSE`. Can be set to `TRUE` if
+#' `sign='positive'`, and the data is already aligned such that
+#' intervals are aligned to the release. In this case, the burst location is
+#' set as the beginning of the interval, and only voicing onset location is
+#' predicted.
+#' @param rel_offset Numeric, default is `0.01`. If `vo_only=TRUE`, the algorithm
+#' may perform poorly if there is periodicity from e.g. voicing bleed early on
+#' in the interval (this is especially likely if used to delimit fricatives,
+#' but probably won't hurt when delimiting stop releases).
+#' `rel_offset` tells `getVOT` how much of the initial portion of an interval
+#' to ignore when looking for voicing onset (in seconds).
 #' @param f0_first Logical; if `TRUE`, the function does not start out by
 #' estimating the location of the closure, but rather uses [phonTools::pitchtrack]
 #' to find the longest period of consecutive voicing, and searches for the burst
@@ -105,6 +116,8 @@ positiveVOT <- function(sound, sr,
                         f0_wl = 30, f0_minacf = 0.5,
                         zcr_min = 0.05,
                         burst_only=FALSE,
+                        vo_only=FALSE,
+                        rel_offset=0.01,
                         f0_first=FALSE,
                         plot=TRUE,
                         params_list=NULL) {
@@ -148,7 +161,7 @@ positiveVOT <- function(sound, sr,
   step <- 0.001*sr
   dur <- length(sound)/sr
 
-  if (f0_first) {
+  if (f0_first & !vo_only) {
     f0 <- phonTools::pitchtrack(sound, fs=sr, show=F)
     time_vec <- f0$time
 
@@ -187,7 +200,7 @@ positiveVOT <- function(sound, sr,
     spike_size <- max(abs(sound))/release_param
     spike <- which(max_amp > spike_size)
     rel <- (vo-(step*200) + ((spike[1])*step))-step
-  } else {
+  } else if (!f0_first & !vo_only) {
     sqlen <- ceiling(length(sound)/2 / sr / ci)
     sq_clo <- seq(from=sr*ci, to=sqlen*sr*ci, by=sr*ci)
 
@@ -210,24 +223,30 @@ positiveVOT <- function(sound, sr,
     spike_size <- max(abs(sound))/release_param
     spike <- which(max_amp > spike_size)
     rel <- (clo[1] + ((spike[1])*step))-step
+  } else if (vo_only) {
+    rel <- 0 + (rel_offset*sr)
+    spike_size <- NA
   }
 
-  if (is.na(rel)) {
-    if (f0_first) {
-      return(list(
-        rel = vo-(sr*0.02),
-        vo = vo,
-        vot = 'NA'
-      ))
-    } else {
-      return(list(
-        rel = clo,
-        vo = clo+(0.02*sr),
-        vot = 'NA'
-      ))
+  if (!vo_only) {
+    if (is.na(rel)) {
+      if (f0_first) {
+        return(list(
+          rel = vo-(sr*0.02),
+          vo = vo,
+          vot = 'NA'
+        ))
+      } else {
+        return(list(
+          rel = clo,
+          vo = clo+(0.02*sr),
+          vot = 'NA'
+        ))
+      }
     }
-
   }
+
+
   if (burst_only) {
     if (plot) {
       plot(sound, type='l', x=seq(0, length(sound)/sr, length.out=length(sound)),
@@ -300,6 +319,7 @@ positiveVOT <- function(sound, sr,
 
     }
 
+    if (rel_offset > 0) rel <- rel - (rel_offset*sr)
     vot <- round((vo-rel)/sr, 4) * 1000
 
     if(plot){

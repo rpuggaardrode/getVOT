@@ -16,6 +16,8 @@ positiveVOT(
   f0_minacf = 0.5,
   zcr_min = 0.05,
   burst_only = FALSE,
+  vo_only = FALSE,
+  rel_offset = 0.01,
   f0_first = FALSE,
   plot = TRUE,
   params_list = NULL
@@ -81,6 +83,19 @@ are consistently below this threshold.
 Default is \code{0.02}.}
 
 \item{burst_only}{Logical; if \code{TRUE}, only burst location is predicted.}
+
+\item{vo_only}{Boolean; default is \code{FALSE}. Can be set to \code{TRUE} if
+\code{sign='positive'}, and the data is already aligned such that
+intervals are aligned to the release. In this case, the burst location is
+set as the beginning of the interval, and only voicing onset location is
+predicted.}
+
+\item{rel_offset}{Numeric, default is \code{0.01}. If \code{vo_only=TRUE}, the algorithm
+may perform poorly if there is periodicity from e.g. voicing bleed early on
+in the interval (this is especially likely if used to delimit fricatives,
+but probably won't hurt when delimiting stop releases).
+\code{rel_offset} tells \code{getVOT} how much of the initial portion of an interval
+to ignore when looking for voicing onset (in seconds).}
 
 \item{f0_first}{Logical; if \code{TRUE}, the function does not start out by
 estimating the location of the closure, but rather uses \link[phonTools:pitchtrack]{phonTools::pitchtrack}
