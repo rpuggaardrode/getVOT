@@ -24,10 +24,9 @@
 #' intervals are aligned to the release. In this case, the burst location is
 #' set as the beginning of the interval, and only voicing onset location is
 #' predicted.
-#' @param rel_offset Numeric, default is `0.01`. If `vo_only=TRUE`, the algorithm
+#' @param rel_offset Numeric, default is `0`. If `vo_only=TRUE`, the algorithm
 #' may perform poorly if there is periodicity from e.g. voicing bleed early on
-#' in the interval (this is especially likely if used to delimit fricatives,
-#' but probably won't hurt when delimiting stop releases).
+#' in the interval (this is especially likely if used to delimit fricatives).
 #' `rel_offset` tells `getVOT` how much of the initial portion of an interval
 #' to ignore when looking for voicing onset (in seconds).
 #'
@@ -52,7 +51,7 @@ getVOT <- function(sound, sr,
                    neg_params_list=NULL,
                    pos_params_list=NULL,
                    vo_only=FALSE,
-                   rel_offset=0.01) {
+                   rel_offset=0) {
 
   if ('positive' %in% sign & 'negative' %in% sign) {
     if (vo_only) stop('If vo_only=TRUE, sign must currently be positive')
