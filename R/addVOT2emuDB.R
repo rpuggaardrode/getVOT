@@ -54,16 +54,11 @@ addVOT2emuDB <- function(emuDB, seg_list, level=NULL,
                          pos_params_list=NULL,
                          neg_params_list=NULL){
 
-  if (verbose) {
-    print('Rewriting JSON files with new level definition')
-  }
+  if (verbose) print('Rewriting JSON files with new level definition')
   emuR::add_levelDefinition(emuDB, new_level_name, type='SEGMENT', verbose=verbose)
 
   if ('character' %in% class(seg_list)) {
-    if (verbose) {
-      print('Finding segment intervals')
-    }
-
+    if (verbose) print('Finding segment intervals')
     str <- paste0('\\u02c8', seg_list)
     labs <- c(seg_list, str)
 
@@ -77,19 +72,8 @@ addVOT2emuDB <- function(emuDB, seg_list, level=NULL,
     sl <- seg_list
   }
 
-  if (verbose) {
-    print('Importing WAV data')
-  }
+  len <- nrow(sl)
 
-  suppressWarnings(
-    all_wav <- emuR::get_trackdata(emuDB, sl, ssffTrackName='MEDIAFILE_SAMPLES',
-                             verbose=verbose))
-
-  if (verbose) {
-    print('Searching for VOTs')
-  }
-
-  len <- length(unique(all_wav$sl_rowIdx))
   itc <- data.frame(session = rep(NA, len*2),
                     bundle = rep(NA, len*2),
                     level = rep(new_level_name, len*2),
@@ -97,19 +81,32 @@ addVOT2emuDB <- function(emuDB, seg_list, level=NULL,
                     attribute = rep(new_level_name, len*2),
                     labels = rep(NA, len*2))
 
+  dbloc <- emuDB$basePath
+
+  if (verbose) print('Predicting VOT')
+
   for (i in 1:len) {
-    one_wav <- all_wav[which(all_wav$sl_rowIdx == i),]
-    vot <- getVOT(one_wav$T1, sl$sample_rate[i], sign=sign,
+    fn <- paste0(dbloc, '/', sl$session[i], '_ses/', sl$bundle[i], '_bndl/',
+                 sl$bundle[i], '.wav')
+    if (sl$sample_start[i] - (0.015*sl$sample_rate[i]) > 0) {
+      t1 <- round(sl$sample_start[i] - (0.015*sl$sample_rate[i]))
+    } else {
+      t1 <- sl$sample_start[i]
+    }
+
+    snd <- rPraat::snd.read(fn, from=t1, to=sl$sample_end[i])
+    vot <- getVOT(snd$sig[,1], sl$sample_rate[i], sign=sign,
                   neg_params_list, pos_params_list)
+
     if (vot$vot > 0) {
-      t_start <- (sl$sample_start[i] / sl$sample_rate[i] * 1000) +
+      t_start <- (t1 / sl$sample_rate[i] * 1000) +
         (vot$rel / sl$sample_rate[i] * 1000)
-      t_end <- (sl$sample_start[i] / sl$sample_rate[i] * 1000) +
+      t_end <- (t1 / sl$sample_rate[i] * 1000) +
         (vot$vo / sl$sample_rate[i] * 1000)
     } else {
-      t_start <- (sl$sample_start[i] / sl$sample_rate[i] * 1000) +
+      t_start <- (t1 / sl$sample_rate[i] * 1000) +
         (vot$vo / sl$sample_rate[i] * 1000)
-      t_end <- (sl$sample_start[i] / sl$sample_rate[i] * 1000) +
+      t_end <- (t1 / sl$sample_rate[i] * 1000) +
         (vot$rel / sl$sample_rate[i] * 1000)
     }
 
@@ -121,9 +118,7 @@ addVOT2emuDB <- function(emuDB, seg_list, level=NULL,
     itc$labels[i*2] <- ''
   }
 
-  if (verbose) {
-    print('Rewriting JSON files with predicted VOT segmentation')
-  }
+  if (verbose) print('Rewriting JSON files with predicted VOT segmentation')
 
   emuR::create_itemsInLevel(emuDB, itc, verbose=verbose)
   co <- emuR::get_levelCanvasesOrder(emuDB, 'default')
