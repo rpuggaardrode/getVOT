@@ -18,6 +18,9 @@ pairs, previously used to optimize parameters with \link{neg_setParams} or
 resulting plot, should they be filled with pictures of my very nice cat
 Kipawsky?}
 }
+\value{
+Called for side effects; produces a plot.
+}
 \description{
 Used to plot hand-annotated voice onset time ("training data") together with
 voice onset time that has been predicted using optimized parameters based on

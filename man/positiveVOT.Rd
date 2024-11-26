@@ -9,15 +9,17 @@ positiveVOT(
   sr,
   closure_interval = 10,
   release_param = 15,
+  rel_method = "diff",
   vo_method = "acf",
   vo_granularity = 1,
   vo_param = 0.85,
   f0_wl = 30,
   f0_minacf = 0.5,
   zcr_min = 0.05,
+  soe_min = 0.01,
   burst_only = FALSE,
   vo_only = FALSE,
-  rel_offset = 0.01,
+  rel_offset = 0,
   f0_first = FALSE,
   plot = TRUE,
   params_list = NULL
@@ -39,6 +41,16 @@ estimated closure where a 1 ms interval has
 an energy equal to or higher than this proportion of the maximum energy in
 \code{sound}. Default is \code{15}.}
 
+\item{rel_method}{String giving the method for predicting the location of the
+burst. There are two legal options:
+\itemize{
+\item \code{raw}. The location of the burst is predicted by searching for
+the first instance in the waveform where the amplitude is above the value
+set by \code{release_param}.
+\item \code{diff} (default). The procedure is the same as in \code{raw}, but the signal is
+differenced first.
+}}
+
 \item{vo_method}{String giving the method for predicting the onset of voicing.
 There are two legal options:
 \itemize{
@@ -46,6 +58,7 @@ There are two legal options:
 of energy autocorrelation in short intervals of \code{sound} relative to the most
 autocorrelated interval during the vowel (see \code{vo_param}). If audio quality
 is sufficiently high and stable, \code{acf} usually gives the best results.
+See \link{vo_acf}.
 \item \code{f0}. The onset of voicing is predicted using the pitch tracking
 algorithm implemented in \link[phonTools:pitchtrack]{phonTools::pitchtrack}.
 \item \code{zcr}. The onset of voicing is predicted from the zero crossing rate.
@@ -54,7 +67,12 @@ ZCR is calculated in
 using a discrete cosine transformation with the number of coefficients set to
 1/10 of the number of windows. The first ZCR value below the threshold set by
 \code{zcr_min} is predicted to correspond to the voicing onset, unless there is
-an adjacent gap in low ZCR values.
+an adjacent gap in low ZCR values. See \link{vo_zcr}.
+\item \code{soe}. The onset of voicing is predicted by passing a differenced,
+downsampled version of the waveform through a cascade of zero frequency
+filters to derive the strength of harmonic excitation (SoE), and choosing
+the first zero crossing where the SoE is above a certain threshold set by
+\code{soe_min}. See \link{vo_soe}.
 }}
 
 \item{vo_granularity}{Numeric, only used when \code{vo_method='acf'}. Mean energy
@@ -82,6 +100,10 @@ predicted to begin when ZCR values after the predicted release
 are consistently below this threshold.
 Default is \code{0.02}.}
 
+\item{soe_min}{Numeric, only used when \code{vo_method='soe'}. Voicing is
+predicted to begin by the first zero crossing with this SoE value in a
+filtered version of the waveform. Default is \code{0.01}.}
+
 \item{burst_only}{Logical; if \code{TRUE}, only burst location is predicted.}
 
 \item{vo_only}{Boolean; default is \code{FALSE}. Can be set to \code{TRUE} if
@@ -90,10 +112,9 @@ intervals are aligned to the release. In this case, the burst location is
 set as the beginning of the interval, and only voicing onset location is
 predicted.}
 
-\item{rel_offset}{Numeric, default is \code{0.01}. If \code{vo_only=TRUE}, the algorithm
+\item{rel_offset}{Numeric, default is \code{0}. If \code{vo_only=TRUE}, the algorithm
 may perform poorly if there is periodicity from e.g. voicing bleed early on
-in the interval (this is especially likely if used to delimit fricatives,
-but probably won't hurt when delimiting stop releases).
+in the interval.
 \code{rel_offset} tells \code{getVOT} how much of the initial portion of an interval
 to ignore when looking for voicing onset (in seconds).}
 
@@ -116,6 +137,7 @@ not important; see details above):
 \item \code{f0_wl}
 \item \code{f0_minacf}
 \item \code{release_param}
+\item \code{rel_method}
 \item \code{f0_first}
 If a \code{params_list} is provided, it will override any corresponding
 parameters in the function call.

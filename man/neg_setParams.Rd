@@ -6,6 +6,7 @@
 \usage{
 neg_setParams(
   directory = ".",
+  when_avoid_soe = 10,
   when_use_f0 = 10,
   verbose = TRUE,
   plot = TRUE,
@@ -19,14 +20,23 @@ where the stop closure is placed somewhere in the first half of the sound file.
 The TextGrid tier containing hand-segmented VOT should be named \code{vot}.
 Default is the current working directory.}
 
+\item{when_avoid_soe}{Numeric; default is \code{10}. Per default, voicing onset is
+predicted with \link{negativeVOT} using \code{method='soe'} (see \link{vo_soe}). This is the
+preferred method because it is much faster than the alternative methods.
+For this reason, other methods are only tested if the average prediction
+error with \code{method='acf'} is above a certain threshold. \code{when_avoid_soe} sets
+this threshold ,i.e. by default, other methods are tested when the prediction
+error with \code{method='soe'} is above 10 ms.}
+
 \item{when_use_f0}{Numeric; default is \code{10}. Per default, voicing onset is
-predicted with \link{negativeVOT} using \code{method='acf'}. This is the preferred method
-because it is significantly faster than the alternative \code{method='f0'}. For
+predicted with \link{negativeVOT} using \code{method='soe'}, alternatively
+\code{method='acf'} or \code{method='zcr'}. These methods are preferred to \code{method='f0'}
+because it is quite slow.  For
 this reason, parameters with \code{method='f0'} are only tested if the average
-prediction error with \code{method='acf'} is above a certain threshold.
+prediction error with other methods are above a certain threshold.
 \code{when_use_f0} sets this threshold; i.e. by default, parameters for
-\code{method='f0'} are tested when the average prediction error with \code{method='acf'}
-is above 10 ms.}
+\code{method='f0'} are tested when the average prediction error with the best
+alternative method is above 10 ms.}
 
 \item{verbose}{Logical; should messages be printed in the console indicating
 the progress? Default is \code{TRUE}.}

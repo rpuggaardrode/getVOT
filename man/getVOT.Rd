@@ -11,7 +11,7 @@ getVOT(
   neg_params_list = NULL,
   pos_params_list = NULL,
   vo_only = FALSE,
-  rel_offset = 0.01
+  rel_offset = 0
 )
 }
 \arguments{
@@ -22,9 +22,9 @@ getVOT(
 \item{sign}{A string giving the type of voice onset time to predict;
 legal values are \code{positive}, \code{negative}, or both. Default is both, in which
 case the function tries to predict whether voice onset time is positive or
-negative. The development of this function is still in the early stages,
-so it is recommended to specify whether VOT is expected to be positive or
-negative when possible.}
+negative. The development of this function is in the early stages,
+so it is strongly recommended to specify whether VOT is expected to be
+positive or negative when possible.}
 
 \item{neg_params_list}{Named list of parameters used to predict negative
 voice onset time; see \link{negativeVOT} for more information. Default is \code{NULL},
@@ -42,10 +42,9 @@ intervals are aligned to the release. In this case, the burst location is
 set as the beginning of the interval, and only voicing onset location is
 predicted.}
 
-\item{rel_offset}{Numeric, default is \code{0.01}. If \code{vo_only=TRUE}, the algorithm
+\item{rel_offset}{Numeric, default is \code{0}. If \code{vo_only=TRUE}, the algorithm
 may perform poorly if there is periodicity from e.g. voicing bleed early on
-in the interval (this is especially likely if used to delimit fricatives,
-but probably won't hurt when delimiting stop releases).
+in the interval (this is especially likely if used to delimit fricatives).
 \code{rel_offset} tells \code{getVOT} how much of the initial portion of an interval
 to ignore when looking for voicing onset (in seconds).}
 }

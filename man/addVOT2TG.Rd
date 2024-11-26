@@ -14,7 +14,7 @@ addVOT2TG(
   pos_params_list = NULL,
   neg_params_list = NULL,
   vo_only = FALSE,
-  rel_offset = 0.01
+  rel_offset = 0
 )
 }
 \arguments{
@@ -61,10 +61,9 @@ intervals are aligned to the release. In this case, the burst location is
 set as the beginning of the interval, and only voicing onset location is
 predicted.}
 
-\item{rel_offset}{Numeric, default is \code{0.01}. If \code{vo_only=TRUE}, the algorithm
+\item{rel_offset}{Numeric, default is \code{0}. If \code{vo_only=TRUE}, the algorithm
 may perform poorly if there is periodicity from e.g. voicing bleed early on
-in the interval (this is especially likely if used to delimit fricatives,
-but probably won't hurt when delimiting stop releases).
+in the interval (this is especially likely if used to delimit fricatives).
 \code{rel_offset} tells \code{getVOT} how much of the initial portion of an interval
 to ignore when looking for voicing onset (in seconds).}
 }

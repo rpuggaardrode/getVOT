@@ -7,15 +7,17 @@
 negativeVOT(
   sound,
   sr,
-  vo_method = "acf",
+  vo_method = "soe",
   closure_interval = 10,
   vo_granularity = 1.2,
   vo_param = 0.9,
   f0_wl = 50,
   f0_minacf = 0.5,
   zcr_min = 0.02,
+  soe_min = 0.01,
   vo_only = FALSE,
   rel_method = "amplitude",
+  release_param = 15,
   plot = TRUE,
   params_list = NULL
 )
@@ -26,12 +28,18 @@ negativeVOT(
 \item{sr}{Integer; sample rate of \code{sound}.}
 
 \item{vo_method}{String giving the method for predicting the onset of voicing.
-There are two legal options:
+There are four legal options:
 \itemize{
-\item \code{acf} (default). The onset of voicing is predicted from the mean degree
+\item \code{soe} (default). The onset of voicing is predicted by passing a differenced,
+downsampled version of the waveform through a cascade of zero frequency
+filters to derive the strength of harmonic excitation (SoE), and choosing
+the first zero crossing where the SoE is above a certain threshold set by
+\code{soe_min}. See \link{vo_soe}.
+\item \code{acf}. The onset of voicing is predicted from the mean degree
 of energy autocorrelation in short intervals of \code{sound} relative to the most
 autocorrelated interval during the vowel (see \code{vo_param}). If audio quality
 is sufficiently high and stable, \code{acf} usually gives the best results.
+See \link{vo_acf}.
 \item \code{f0}. The onset of voicing is predicted using the pitch tracking
 algorithm implemented in \link[phonTools:pitchtrack]{phonTools::pitchtrack}.
 \item \code{zcr}. The onset of voicing is predicted from the zero crossing rate.
@@ -40,7 +48,7 @@ ZCR is calculated in
 using a discrete cosine transformation with the number of coefficients set to
 1/10 of the number of windows. The first ZCR value below the threshold set by
 \code{zcr_min} is predicted to correspond to the voicing onset, unless there is
-an adjacent gap in low ZCR values.
+an adjacent gap in low ZCR values. See \link{vo_zcr}.
 }}
 
 \item{closure_interval}{Numeric. The rough location of the voicing onset is
@@ -69,6 +77,10 @@ values below this are ignored by \link[phonTools:pitchtrack]{phonTools::pitchtra
 predicted to begin when ZCR values are consistently below this threshold.
 Default is \code{0.02}.}
 
+\item{soe_min}{Numeric, only used when \code{vo_method='soe'}. Voicing is
+predicted to begin by the first zero crossing with this SoE value in a
+filtered version of the waveform. Default is \code{0.01}.}
+
 \item{vo_only}{Logical; if \code{TRUE}, only voicing onset is predicted.}
 
 \item{rel_method}{String giving the method for predicting the location of the
@@ -88,7 +100,16 @@ FFT spectra of short portions of \code{sound} after the predicted onset of voici
 and the smoothest spectrum is predicted to be the location of the transient.
 If audio quality is sufficiently high and stable, \code{transient} usually gives
 the best results.
+\item \code{diff}. The location of the burst is predicted by searching for the
+first peak in the differenced signal above a certain threshold
+relative to the highest peak in the differenced signal.
 }}
+
+\item{release_param}{Numeric. The location of the burst is predicted by
+searching for the first instance after the
+estimated closure where a 1 ms interval has
+an energy equal to or higher than this proportion of the maximum energy in
+\code{sound}. Default is \code{15}.}
 
 \item{plot}{Logical; should the results be plotted? Default is \code{TRUE}.}
 
@@ -104,7 +125,9 @@ not important; see details above):
 \item \code{f0_wl}
 \item \code{f0_minacf}
 \item \code{rel_method}
-\item \code{min_zcr}
+\item \code{release_param}
+\item \code{zcr_min}
+\item \code{soe_min}
 If a \code{params_list} is provided, it will override any corresponding
 parameters in the function call.
 }}

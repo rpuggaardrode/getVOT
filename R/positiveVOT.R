@@ -15,12 +15,20 @@
 #' estimated closure where a 1 ms interval has
 #' an energy equal to or higher than this proportion of the maximum energy in
 #' `sound`. Default is `15`.
+#' @param rel_method String giving the method for predicting the location of the
+#' burst. There are two legal options:
+#' * `raw`. The location of the burst is predicted by searching for
+#' the first instance in the waveform where the amplitude is above the value
+#' set by `release_param`.
+#' * `diff` (default). The procedure is the same as in `raw`, but the signal is
+#' differenced first.
 #' @param vo_method String giving the method for predicting the onset of voicing.
 #' There are two legal options:
 #' * `acf` (default). The onset of voicing is predicted from the mean degree
 #' of energy autocorrelation in short intervals of `sound` relative to the most
 #' autocorrelated interval during the vowel (see `vo_param`). If audio quality
 #' is sufficiently high and stable, `acf` usually gives the best results.
+#' See [vo_acf].
 #' * `f0`. The onset of voicing is predicted using the pitch tracking
 #' algorithm implemented in [phonTools::pitchtrack].
 #' * `zcr`. The onset of voicing is predicted from the zero crossing rate.
@@ -29,7 +37,12 @@
 #' using a discrete cosine transformation with the number of coefficients set to
 #' 1/10 of the number of windows. The first ZCR value below the threshold set by
 #' `zcr_min` is predicted to correspond to the voicing onset, unless there is
-#' an adjacent gap in low ZCR values.
+#' an adjacent gap in low ZCR values. See [vo_zcr].
+#' * `soe`. The onset of voicing is predicted by passing a differenced,
+#' downsampled version of the waveform through a cascade of zero frequency
+#' filters to derive the strength of harmonic excitation (SoE), and choosing
+#' the first zero crossing where the SoE is above a certain threshold set by
+#' `soe_min`. See [vo_soe].
 #' @param vo_granularity Numeric, only used when `vo_method='acf'`. Mean energy
 #' autocorrelation is calculated for intervals of this duration (in ms). Default
 #' is `1`.
@@ -65,6 +78,9 @@
 #' predicted to begin when ZCR values after the predicted release
 #' are consistently below this threshold.
 #' Default is `0.02`.
+#' @param soe_min Numeric, only used when `vo_method='soe'`. Voicing is
+#' predicted to begin by the first zero crossing with this SoE value in a
+#' filtered version of the waveform. Default is `0.01`.
 #' @param plot Logical; should the results be plotted? Default is `TRUE`.
 #' @param params_list A named list containing the above parameters for
 #' determining the onset of voicing. Usually returned by [pos_setParams()], but
@@ -77,6 +93,7 @@
 #' * `f0_wl`
 #' * `f0_minacf`
 #' * `release_param`
+#' * `rel_method`
 #' * `f0_first`
 #' If a `params_list` is provided, it will override any corresponding
 #' parameters in the function call.
@@ -109,11 +126,13 @@
 positiveVOT <- function(sound, sr,
                         closure_interval = 10,
                         release_param = 15,
+                        rel_method='diff',
                         vo_method = 'acf',
                         vo_granularity = 1,
                         vo_param = 0.85,
                         f0_wl = 30, f0_minacf = 0.5,
                         zcr_min = 0.05,
+                        soe_min = 0.01,
                         burst_only=FALSE,
                         vo_only=FALSE,
                         rel_offset=0,
@@ -141,6 +160,9 @@ positiveVOT <- function(sound, sr,
     if ('vo_method' %in% named_params) {
       vo_method <- params_list[['vo_method']]
     }
+    if ('rel_method' %in% named_params) {
+      rel_method <- params_list[['rel_method']]
+    }
     if ('f0_wl' %in% named_params) {
       f0_wl <- params_list[['f0_wl']]
     }
@@ -152,11 +174,13 @@ positiveVOT <- function(sound, sr,
     }
   }
 
-  if (!(vo_method %in% c('acf', 'f0', 'zcr'))) {
-    stop('vo_method must be either acf or f0')
+  if (!(vo_method %in% c('acf', 'f0', 'zcr', 'soe'))) {
+    stop('vo_method must be either acf, f0, zcr, or soe')
+  }
+  if (!(rel_method %in% c('raw', 'diff'))) {
+    stop('rel_method must be either raw or diff')
   }
 
-  ci <- closure_interval/1000
   step <- 0.001*sr
   dur <- length(sound)/sr
 
@@ -167,7 +191,8 @@ positiveVOT <- function(sound, sr,
     adj_f0 <- c()
     f0_seq <- seq(0, dur*1000, 100)
     for (s in 1:length(f0_seq)) {
-      adj_f0[s] <- length(which(time_vec > f0_seq[s]+1 & time_vec < f0_seq[s]+100))
+      adj_f0[s] <- length(which(time_vec > f0_seq[s]+1 &
+                                  time_vec < f0_seq[s]+100))
     }
     if (max(adj_f0) > 40) {
       many_adj_f0 <- (which(adj_f0 > 40)[1] * 100) - 50
@@ -178,6 +203,7 @@ positiveVOT <- function(sound, sr,
     v_loc <- which.min(abs(many_adj_f0 - time_vec))
     diff_vec <- as.numeric(diff(time_vec) <= 2)
     vo_index <- rev(which(diff_vec[1:v_loc] == 0))[1] + 1
+
     if (is.na(vo_index)) {
       vo <- time_vec[1] * step
     } else {
@@ -189,39 +215,23 @@ positiveVOT <- function(sound, sr,
     } else {
       sq_rel <- seq(from=vo-(sr*0.05), to=vo, by=step)
     }
-    max_amp <- c()
-    i <- 1
-    for (s in sq_rel) {
-      max_amp[i] <- max(abs(sound[s:(s+step-1)]))
-      i <- i+1
-    }
-
-    spike_size <- max(abs(sound))/release_param
-    spike <- which(max_amp > spike_size)
-    rel <- (vo-(step*200) + ((spike[1])*step))-step
+    rel <- rel_amplitude(sound, vo-(step*200), sq_rel, step, release_param, F)
+    spike_size <- rel$spike_size
+    rel <- rel$rel
   } else if (!f0_first & !vo_only) {
-    sqlen <- ceiling(length(sound)/2 / sr / ci)
-    sq_clo <- seq(from=sr*ci, to=sqlen*sr*ci, by=sr*ci)
 
-    mean_amp <- c()
-    i <- 1
-    for (s in sq_clo) {
-      mean_amp[i] <- mean(abs(sound[(s-(sr*ci)+1):s]))
-      i <- i+1
-    }
-    clo <- (which(mean_amp==min(mean_amp)) - 0.5) * sr * ci
+    clo <- find_closure(sound, sr, closure_interval)
 
-    sq_rel <- seq(from=clo[1], to=length(sound), by=step)
-    max_amp <- c()
-    i <- 1
-    for (s in sq_rel) {
-      max_amp[i] <- max(abs(sound[s:(s+step-1)]))
-      i <- i+1
+    if (rel_method == 'raw') {
+      sig4amp <- sound
+    } else if (rel_method == 'diff') {
+      sig4amp <- diff(sound)
     }
 
-    spike_size <- max(abs(sound))/release_param
-    spike <- which(max_amp > spike_size)
-    rel <- (clo[1] + ((spike[1])*step))-step
+    sq_rel <- seq(from=clo[1], to=length(sig4amp), by=step)
+    rel <- rel_amplitude(sig4amp, clo[1], sq_rel, step, release_param, F)
+    spike_size <- rel$spike_size
+    rel <- rel$rel
   } else if (vo_only) {
     rel <- 0 + (rel_offset*sr)
     spike_size <- NA
@@ -245,13 +255,12 @@ positiveVOT <- function(sound, sr,
     }
   }
 
-
   if (burst_only) {
     if (plot) {
       plot(sound, type='l', x=seq(0, length(sound)/sr, length.out=length(sound)),
            xlab='Time (s)',
            ylab='Amplitude')
-      graphics::abline(v=rel/sr, col='red')
+      graphics::abline(v=rel/sr, col='red', lwd = 2)
     }
     return(list(
       rel = rel,
@@ -261,23 +270,8 @@ positiveVOT <- function(sound, sr,
     ))
   } else {
     if (vo_method == 'acf') {
-      sq_vo <- seq(from=rel+(step*5), to=rel+(step*200), by=(step*vo_granularity))
-      mu_acf <- c()
-      i <- 1
-      for (s in sq_vo) {
-        acf <- stats::acf(sound[s:(s+(step*vo_granularity)-1)], plot=F,
-                          na.action=stats::na.pass)
-        mu_acf[i] <- mean(acf$acf)
-        i <- i+1
-      }
-
-      hi_acf <- which(mu_acf > max(mu_acf, na.rm=T)*vo_param)
-      if (is.na(hi_acf[2])) {
-        vo <- (rel + (hi_acf[1]*(step*vo_granularity)) + step)
-      } else {
-        vo <- (rel + (hi_acf[2]*(step*vo_granularity)) + step)
-      }
-
+      vo <- vo_acf(sound, rel+(step*5), rel+(step*200),
+                   rel, step, vo_granularity, vo_param)
     } else if (vo_method == 'f0') {
       f0 <- phonTools::pitchtrack(sound[rel:length(sound)], fs=sr, show=F,
                                   windowlength=f0_wl, minacf=f0_minacf)
@@ -287,36 +281,17 @@ positiveVOT <- function(sound, sr,
         return(list(
           rel = rel,
           vo = rel+(0.02*sr),
-          vot = 'NA'
+          vot = 'NA',
+          spike=spike_size
         ))
       }
 
     } else if (vo_method == 'zcr') {
-      vo_srch <- sound[rel:length(sound)]
-      zcr_ts <- seewave::zcr(vo_srch, sr, wl=sr*0.005, ovlp=80, plot=F)
-      zcr_smooth <- emuR::dct(zcr_ts[,'zcr'], m=length(zcr_ts)/20, fit=T)
-      zcr_smooth[1:10] <- NA
-
-      if (min(zcr_smooth, na.rm=T) < zcr_min) {
-        low_zcr <- which(zcr_smooth < zcr_min)
-        if (max(diff(low_zcr)) < 40) {
-          f0_start <- (zcr_ts[low_zcr[1], 'time'] * sr)
-        } else {
-          first_voi <- which(diff(low_zcr) > 40)[1] + 1
-          if (first_voi > 20 | is.na(first_voi)) {
-            f0_start <- (zcr_ts[low_zcr[1], 'time'] * sr)
-          } else {
-            f0_start <- (zcr_ts[low_zcr[first_voi], 'time'] * sr)
-          }
-        }
-      } else {
-        f0_start <- (min(zcr_ts[,'zcr']) * sr)
-      }
-
-      vo <- f0_start + rel
-      names(vo) <- NULL
-
+      vo <- vo_zcr(sound, rel, sr, zcr_min, T)
+    } else if (vo_method == 'soe') {
+      vo <- vo_soe(sound, rel, sr, soe_min)
     }
+
 
     if (rel_offset > 0) rel <- rel - (rel_offset*sr)
     vot <- round((vo-rel)/sr, 4) * 1000
@@ -325,8 +300,8 @@ positiveVOT <- function(sound, sr,
       plot(y=sound, x=seq(0, dur, length.out=length(sound)), type='l',
            xlab='Time (s)',
            ylab='Amplitude')
-      graphics::abline(v=rel/sr, col='red')
-      graphics::abline(v=vo/sr, col='red')
+      graphics::abline(v=rel/sr, col='red', lwd = 2)
+      graphics::abline(v=vo/sr, col='red', lwd = 2)
     }
 
     return(list(

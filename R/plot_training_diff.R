@@ -15,6 +15,7 @@
 #' resulting plot, should they be filled with pictures of my very nice cat
 #' Kipawsky?
 #'
+#' @return Called for side effects; produces a plot.
 #' @export
 #'
 #' @examples
@@ -25,10 +26,13 @@ plot_training_diff <- function(directory,
                                params_list,
                                cat=FALSE) {
 
+  p <- graphics::par(no.readonly=TRUE)
+  on.exit(graphics::par(p))
+
   wavs <- list.files(directory, '*.wav')
   tgs <- list.files(directory, '*.TextGrid')
 
-  num <- length(wavs)
+  num <- length(wavs) + 1
   frames <- ceiling(sqrt(num))
   if (num > frames*(frames-1)) {
     plot_dim <- c(frames, frames)
@@ -36,9 +40,15 @@ plot_training_diff <- function(directory,
     plot_dim <- c(frames, (frames-1))
   }
 
-  graphics::par(mfrow=plot_dim, mai=c(0.4, 0.4, 0.3, 0.3))
+  graphics::par(mfrow=plot_dim, mai=c(0.55, 0.55, 0.15, 0.15))
 
-  for (s in 1:num) {
+  plot(1, type = "n", axes=FALSE, xlab="", ylab="")
+  graphics::legend(x = 'center', y = 'center',
+                   legend = c('Predicted', 'Hand-annotated'),
+                   col = c('red', 'blue'), lty = c('solid', 'dashed'),
+                   inset = 0, cex = 1.2, lwd = 2)
+
+  for (s in 1:(num-1)) {
     snd <- rPraat::snd.read(paste0(directory, '/', wavs[s]))
     tg <- rPraat::tg.read(paste0(directory, '/', tgs[s]))
     sig <- snd[['sig']]
@@ -48,21 +58,20 @@ plot_training_diff <- function(directory,
       tmp <- positiveVOT(sig[,1], fs, params_list=params_list)
       if (tmp$vot == "NA") {
         plot(y=sig, x=seq(0, length(sig)/fs, length.out=length(sig)), type='l',
-             xlab='Time (s)',
-             ylab='Amplitude')
+             xlab='Time (s)', ylab='Amplitude')
       }
     } else {
       tmp <- negativeVOT(sig[,1], fs, params_list=params_list)
       if (tmp$vot == "NA") {
         plot(y=sig, x=seq(0, length(sig)/fs, length.out=length(sig)), type='l',
-             xlab='Time (s)',
-             ylab='Amplitude')
+             xlab='Time (s)', ylab='Amplitude')
       }
     }
 
-    graphics::abline(v=tg[['vot']][['t1']][2], col='blue')
-    graphics::abline(v=tg[['vot']][['t1']][3], col='blue')
+    graphics::abline(v=tg[['vot']][['t1']][2], col='blue', lty='dashed', lwd=2)
+    graphics::abline(v=tg[['vot']][['t1']][3], col='blue', lty='dashed', lwd=2)
   }
+
 
   if (cat) {
     spots <- plot_dim[1]*plot_dim[2]
@@ -77,4 +86,6 @@ plot_training_diff <- function(directory,
       graphics::rasterImage(cat_pic, 0.6, 0.6, 1.4, 1.4)
     }
   }
+
+  graphics::par(p)
 }

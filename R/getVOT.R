@@ -8,9 +8,9 @@
 #' @param sign A string giving the type of voice onset time to predict;
 #' legal values are `positive`, `negative`, or both. Default is both, in which
 #' case the function tries to predict whether voice onset time is positive or
-#' negative. The development of this function is still in the early stages,
-#' so it is recommended to specify whether VOT is expected to be positive or
-#' negative when possible.
+#' negative. The development of this function is in the early stages,
+#' so it is strongly recommended to specify whether VOT is expected to be
+#' positive or negative when possible.
 #' @param neg_params_list Named list of parameters used to predict negative
 #' voice onset time; see [negativeVOT] for more information. Default is `NULL`,
 #' in which case default parameters are used, but note that the default
@@ -62,7 +62,7 @@ getVOT <- function(sound, sr,
       neg_test <- negativeVOT(sound, sr, plot=F,
                               params_list=neg_params_list)
 
-      if (neg_test$vo < pos_test$rel && -neg_test$vot < neg_test$voi_int/2) {
+      if (neg_test$vo < pos_test$rel) {
         return(neg_test)
       } else {
         return(pos_test[-4])

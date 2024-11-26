@@ -1,6 +1,6 @@
 Package: getVOT
 Title: Predict voice onset time
-Version: 0.1.4
+Version: 0.2.0
 Authors@R: 
     person("Rasmus", "Puggaard-Rode", , "r.puggaard@phonetik.uni-muenchen.de", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-4522-9987"))
@@ -21,7 +21,9 @@ Imports:
     purrr,
     rPraat,
     seewave,
+    signal,
     stats,
-    stringr
+    stringr,
+    tuneR
 URL: https://github.com/rpuggaardrode/getVOT
 BugReports: https://github.com/rpuggaardrode/getVOT/issues
