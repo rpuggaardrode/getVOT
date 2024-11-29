@@ -102,9 +102,12 @@
 #' * `rel` Gives the sample number where the stop burst is predicted.
 #' * `vo` Gives the sample number where the onset of voicing is predicted.
 #' * `vot` Gives the predicted voice onset time in ms.
-#' * `spike_size` Gives the amplitude of the burst relative to the highest
+#' * `spike` Gives the amplitude of the burst relative to the highest
 #' measured amplitude in the signal. Potentially used by the [getVOT] function
 #' to predict whether voice onset time is positive or negative.
+#' * `spike_loc` Gives the sample number of the loudest sample in the signal.
+#' Potentially used by the [getVOT] function to predict whether voice onset
+#' time is positive or negative.
 #' @seealso This function is called by the more general and somewhat less
 #' flexible function [getVOT], which is in turn called by the functions
 #' [VOT2newTG], [addVOT2TG], and [addVOT2emuDB] for bulk analyzing sounds
@@ -217,6 +220,7 @@ positiveVOT <- function(sound, sr,
     }
     rel <- rel_amplitude(sound, vo-(step*200), sq_rel, step, release_param, F)
     spike_size <- rel$spike_size
+    spike_loc <- rel$spike_loc
     rel <- rel$rel
   } else if (!f0_first & !vo_only) {
 
@@ -231,10 +235,12 @@ positiveVOT <- function(sound, sr,
     sq_rel <- seq(from=clo[1], to=length(sig4amp), by=step)
     rel <- rel_amplitude(sig4amp, clo[1], sq_rel, step, release_param, F)
     spike_size <- rel$spike_size
+    spike_loc <- rel$spike_loc
     rel <- rel$rel
   } else if (vo_only) {
     rel <- 0 + (rel_offset*sr)
     spike_size <- NA
+    spike_loc <- NA
   }
 
   if (!vo_only) {
@@ -266,7 +272,8 @@ positiveVOT <- function(sound, sr,
       rel = rel,
       vo = NA,
       vot = NA,
-      spike=spike_size
+      spike=spike_size,
+      spike_loc=spike_loc
     ))
   } else {
     if (vo_method == 'acf') {
@@ -282,7 +289,8 @@ positiveVOT <- function(sound, sr,
           rel = rel,
           vo = rel+(0.02*sr),
           vot = 'NA',
-          spike=spike_size
+          spike=spike_size,
+          spike_loc=spike_loc
         ))
       }
 
@@ -308,7 +316,8 @@ positiveVOT <- function(sound, sr,
       rel = rel,
       vo = vo,
       vot = vot,
-      spike = spike_size
+      spike = spike_size,
+      spike_loc = spike_loc
     ))
   }
 

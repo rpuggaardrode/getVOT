@@ -67,7 +67,9 @@ rel_amplitude <- function(sound, start, sq_rel, step,
   } else {
     spike_size <- max(abs(sound))/release_param
     spike <- which(max_amp > spike_size)
+    spike_loc <- start + which.max(abs(sound))
     pred_rel <- (start + ((spike[1])*step))-step
-    return(list(rel = pred_rel, spike_size = spike_size))
+    return(list(rel = pred_rel, spike_size = spike_size, spike_loc = spike_loc))
+    # return(list(rel = pred_rel, spike_size = spike_loc))
   }
 }

@@ -1,3 +1,8 @@
+# getVOT 0.2.1
+
+* Made some slight improvements to the functionality for predicting whether
+a stop is pre-voiced or not.
+
 # getVOT 0.2.0
 
 * The code has been extensively restructured and is now much more modular,

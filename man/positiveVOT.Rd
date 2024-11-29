@@ -149,9 +149,12 @@ A named list with the following elements:
 \item \code{rel} Gives the sample number where the stop burst is predicted.
 \item \code{vo} Gives the sample number where the onset of voicing is predicted.
 \item \code{vot} Gives the predicted voice onset time in ms.
-\item \code{spike_size} Gives the amplitude of the burst relative to the highest
+\item \code{spike} Gives the amplitude of the burst relative to the highest
 measured amplitude in the signal. Potentially used by the \link{getVOT} function
 to predict whether voice onset time is positive or negative.
+\item \code{spike_loc} Gives the sample number of the loudest sample in the signal.
+Potentially used by the \link{getVOT} function to predict whether voice onset
+time is positive or negative.
 }
 }
 \description{

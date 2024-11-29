@@ -57,23 +57,23 @@ getVOT <- function(sound, sr,
     if (vo_only) stop('If vo_only=TRUE, sign must currently be positive')
     pos_test <- positiveVOT(sound, sr, plot=F,
                             params_list=pos_params_list)
-
-    if (pos_test$spike > 0.025 | pos_test$vot < 10) {
-      neg_test <- negativeVOT(sound, sr, plot=F,
-                              params_list=neg_params_list)
-
-      if (neg_test$vo < pos_test$rel) {
+    neg_test <- negativeVOT(sound, sr, plot=F,
+                            params_list=neg_params_list)
+    neg_lapse <- pos_test$spike_loc - neg_test$vo
+    pos_lapse <- pos_test$spike_loc - pos_test$rel
+    if (pos_lapse < neg_lapse) {
+      if (pos_test$spike < 0.025) {
         return(neg_test)
       } else {
-        return(pos_test[-4])
+        return(pos_test[-c(4,5)])
       }
     } else {
-      return(pos_test[-4])
+      return(neg_test[-c(4,5)])
     }
   } else if ('positive' %in% sign) {
     tmp <- positiveVOT(sound, sr, plot=F, params_list=pos_params_list,
                        vo_only=vo_only, rel_offset=rel_offset)
-    return(tmp[-4])
+    return(tmp[-c(4,5)])
   } else if ('negative' %in% sign) {
     if (vo_only) stop('If vo_only=TRUE, sign must currently be positive')
     tmp <- negativeVOT(sound, sr, plot=F, params_list=neg_params_list)
