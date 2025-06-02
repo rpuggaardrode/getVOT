@@ -1,3 +1,7 @@
+# getVOT 0.2.3
+
+* Fixed typo
+
 # getVOT 0.2.2
 
 * Added check to make sure that voicing onset value in `negativeVOT()` is
