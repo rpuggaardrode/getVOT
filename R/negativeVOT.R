@@ -203,7 +203,7 @@ negativeVOT <- function(sound, sr,
 
   }
 
-  if (length(f0_start > 1)) f0_start <- f0_start[1]
+  if (length(f0_start) > 1) f0_start <- f0_start[1]
 
   if (vo_only) {
     if (plot) {
