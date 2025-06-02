@@ -1,3 +1,8 @@
+# getVOT 0.2.2
+
+* Added check to make sure that voicing onset value in `negativeVOT()` is
+never a vector.
+
 # getVOT 0.2.1
 
 * Made some slight improvements to the functionality for predicting whether
